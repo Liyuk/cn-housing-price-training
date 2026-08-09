@@ -3,6 +3,9 @@ __pycache__/
 .DS_Store
 data/raw/
 data/processed/*.csv
+!data/processed/district_price_baselines.csv
+!data/processed/district_price_forecast_2026_2030.csv
 models/
 reports/*.json
 reports/*.png
+!reports/district_forecast_model_selection.json

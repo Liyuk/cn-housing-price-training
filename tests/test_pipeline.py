@@ -16,6 +16,13 @@ from src.audit import audit_price_panel
 from src.sample import sample_panel
 from src.explain import permutation_importance_report
 from src.source_labels import classify_source, label_rows
+from src.district_forecast import (
+    BEIJING_DISTRICTS,
+    CHONGQING_DISTRICTS,
+    choose_long_horizon_method,
+    align_baselines_to_latest,
+    project_district_prices,
+)
 
 
 class PipelineTests(unittest.TestCase):
@@ -254,6 +261,66 @@ class PipelineTests(unittest.TestCase):
             "methodology": "cumulative_ytd_official",
         })
         self.assertEqual(result["source_tier"], "A_official")
+
+    def test_district_universe_covers_requested_municipal_districts(self):
+        self.assertIn("西城区", BEIJING_DISTRICTS)
+        self.assertIn("北京经济技术开发区", BEIJING_DISTRICTS)
+        self.assertIn("渝中区", CHONGQING_DISTRICTS)
+        self.assertIn("黔江区", CHONGQING_DISTRICTS)
+        self.assertEqual(len(BEIJING_DISTRICTS), 17)
+        self.assertEqual(len(CHONGQING_DISTRICTS), 26)
+
+    def test_long_horizon_selection_handles_stable_series(self):
+        import pandas as pd
+
+        months = pd.date_range("2019-01", periods=72, freq="MS")
+        frame = pd.DataFrame({
+            "month": months,
+            "city": "测试",
+            "market": "secondhand",
+            "month_on_month": [99.5] * 72,
+            "yoy": [95.0] * 72,
+        })
+        method, scores = choose_long_horizon_method(frame, horizon=12)
+        self.assertEqual(method, "mean12")
+        self.assertIn("mean_reversion", scores)
+
+    def test_project_district_prices_returns_year_end_rows_and_bounds(self):
+        import pandas as pd
+
+        city_paths = pd.DataFrame({
+            "city": ["北京"] * 60,
+            "month": pd.date_range("2026-06", periods=60, freq="MS"),
+            "monthly_index": [100.0] * 60,
+        })
+        baselines = pd.DataFrame([{
+            "city": "北京", "district": "测试区", "base_price_yuan_m2": 10000,
+            "base_month": "2026-05", "source_tier": "C_proxy", "resilience_score": 0.5,
+        }])
+        result = project_district_prices(city_paths, baselines)
+        self.assertEqual(list(result["year"]), [2026, 2027, 2028, 2029, 2030])
+        self.assertTrue((result["price_base_yuan_m2"] == 10000).all())
+        self.assertTrue((result["price_low_yuan_m2"] <= result["price_base_yuan_m2"]).all())
+        self.assertTrue((result["price_base_yuan_m2"] <= result["price_high_yuan_m2"]).all())
+
+    def test_align_baselines_applies_intervening_city_index_changes(self):
+        import pandas as pd
+        import tempfile
+        import os
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "prices.csv")
+            pd.DataFrame([
+                {"month": "2026-05", "city": "北京", "market": "secondhand", "month_on_month": 100.0},
+                {"month": "2026-06", "city": "北京", "market": "secondhand", "month_on_month": 101.0},
+            ]).to_csv(path, index=False)
+            baselines = pd.DataFrame([{
+                "city": "北京", "district": "测试区", "base_month": "2026-05",
+                "base_price_yuan_m2": 10000,
+            }])
+            result = align_baselines_to_latest(baselines, path)
+            self.assertEqual(result.iloc[0]["base_price_yuan_m2"], 10100)
+            self.assertEqual(result.iloc[0]["base_month"], "2026-06")
 
 
 if __name__ == "__main__":
