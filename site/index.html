@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>中国 70 城住宅价格指数 · 五年预测（2026—2030）</title>
+  <meta name="description" content="中国 70 城二手住宅价格指数的可解释机器学习预测：三成分组合模型、情景区间与驻底分析。数据与报告来自 cn-housing-price-training 项目。" />
+  <meta name="color-scheme" content="light dark" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <button class="theme-toggle" id="theme-toggle" type="button" aria-label="切换深色/浅色主题">
+    <span id="theme-label">深色</span>
+  </button>
+  <div id="boot-error" role="alert"></div>
+
+  <div class="page">
+    <header class="masthead">
+      <p class="kicker">数据 · 方法 · 可复现研究</p>
+      <h1>中国 70 城住宅价格指数与五年预测</h1>
+      <p class="lede">
+        基于国家统计局公开月报构建的 70 城二手住宅价格指数面板（2019-01 – 2026-06），
+        用<b>可解释三成分组合模型</b>预测 2026-07 – 2031-06 的价格路径。方法可解释：每个市场采用什么方法、分配多少权重，由它自己的历史数据决定，而不是人为假设。
+      </p>
+      <div class="meta-row">
+        <span id="coverage-note"></span>
+        <span>模型输出 = 官方价格指数，不是每平方米成交价</span>
+      </div>
+    </header>
+
+    <!-- ================= 1. Hero ================= -->
+    <section aria-label="关键数字">
+      <div class="hero-grid">
+        <div class="stat-tile negative" id="stat-nat-base">
+          <div class="label">全国 · 五年基准情景</div>
+          <div class="value"><span class="unit">累计</span></div>
+          <div class="sub"></div>
+        </div>
+        <div class="stat-tile negative" id="stat-bj-base">
+          <div class="label">北京 · 五年基准情景</div>
+          <div class="value"><span class="unit">累计</span></div>
+          <div class="sub"></div>
+        </div>
+        <div class="stat-tile negative" id="stat-nat-hist">
+          <div class="label">全国 · 过去 60 个月累计</div>
+          <div class="value"><span class="unit">累计</span></div>
+          <div class="sub">2021-07 → 2026-06</div>
+        </div>
+        <div class="stat-tile negative" id="stat-bj-hist">
+          <div class="label">北京 · 过去 60 个月累计</div>
+          <div class="value"><span class="unit">累计</span></div>
+          <div class="sub">2021-07 → 2026-06</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 2. Forecast fan ================= -->
+    <section id="forecast">
+      <div class="section-head">
+        <h2>五年预测：情景区间</h2>
+        <p>
+          按历史 5 年实际波动宽度锚定的三个情景（低 / 基准 / 高）。基准情景延续最近 12 个月的动量，
+          并非对政策或宏观走势的主观判断——模型明确无法内生预测"底"。
+        </p>
+      </div>
+      <div class="card">
+        <div class="filters">
+          <span class="filter-label">区域</span>
+          <div class="seg" data-region>
+            <button class="active" data-v="全国">全国 70 城</button>
+            <button data-v="北京">北京</button>
+          </div>
+        </div>
+        <div id="chart-fan" class="chart tall" role="img" aria-label="二手住宅价格指数预测情景区间"></div>
+        <p class="footnote">
+          纵轴为定基价格指数（<span id="anchor-label">2026-06</span> = 100），历史为 70 城（或北京）环比指数均值链式累乘；
+          预测区间为模型输出的低 / 基准 / 高情景。区间宽度锚定历史 5 年波动，<b>不代表概率分布</b>。
+        </p>
+      </div>
+    </section>
+
+    <!-- ================= 3. Method: weights ================= -->
+    <section id="method">
+      <div class="section-head">
+        <h2>方法：可解释三成分组合</h2>
+        <p>
+          每个月的预测 = 三个可解释成分的加权和，权重由<b>滚动样本外验证</b>在 0.25 步长网格中选出
+          （仅用决策时点之前的历史，避免数据窥探）。权重本身就是解释。
+        </p>
+      </div>
+      <div class="weights-grid">
+        <div class="weight-panel">
+          <span class="market-tag national">全国 70 城</span>
+          <h3>下行趋势市</h3>
+          <div id="weights-nat"></div>
+          <div class="model-note"></div>
+        </div>
+        <div class="weight-panel">
+          <span class="market-tag beijing">北京</span>
+          <h3>均值回归市</h3>
+          <div id="weights-bj"></div>
+          <div class="model-note"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 4. Component decomposition ================= -->
+    <section id="components">
+      <div class="section-head">
+        <h2>预测成分分解</h2>
+        <p>
+          逐月展示三个成分与加权结果。全国全部权重落在趋势延续上；北京则给均值回归 50%、趋势与季节各 25%。
+        </p>
+      </div>
+      <div class="card">
+        <div class="filters">
+          <span class="filter-label">区域</span>
+          <div class="seg" data-region>
+            <button class="active" data-v="全国">全国 70 城</button>
+            <button data-v="北京">北京</button>
+          </div>
+        </div>
+        <div id="chart-component" class="chart" role="img" aria-label="预测成分分解"></div>
+        <p class="footnote">虚线为三成分加权和，即模型预测的环比指数；三个成分的占比即上方权重。</p>
+      </div>
+    </section>
+
+    <!-- ================= 5. City heatmap ================= -->
+    <section id="cities">
+      <div class="section-head">
+        <h2>70 城分化：二手住宅同比指数</h2>
+        <p>
+          同一月份内城市间分化极大。热力图按 2026-06 同比降序排列，颜色越深代表同比下降越多（指数 100 = 持平）。
+        </p>
+      </div>
+      <div class="card">
+        <div id="chart-heat" class="chart tall" role="img" aria-label="70 城二手住宅同比指数热力图"></div>
+        <p class="footnote">
+          单元格为同比指数（上年同月 = 100）；空白为当月无数据。来源：国家统计局 70 城月报，口径为"住宅销售价格统计调查方案"。
+        </p>
+      </div>
+    </section>
+
+    <!-- ================= 6. City detail ================= -->
+    <section id="city-detail">
+      <div class="section-head">
+        <h2>单城走势</h2>
+        <p>从 70 城中选一座城市查看其同比指数轨迹，其余城市淡化为上下文。</p>
+      </div>
+      <div class="card">
+        <div class="filters">
+          <span class="filter-label">城市</span>
+          <select class="city-picker" id="city-picker" aria-label="选择城市"></select>
+        </div>
+        <div id="chart-city" class="chart" role="img" aria-label="单城二手住宅同比指数走势"></div>
+      </div>
+    </section>
+
+    <!-- ================= 7. Beijing district scenarios ================= -->
+    <section id="districts">
+      <div class="section-head">
+        <h2>北京 17 区挂牌价情景（2030 年末）</h2>
+        <p>
+          将城市级官方指数路径投影到区级挂牌均价的基准上。柱为 2026 与 2030 基准，浅橙色条为 2030 低–高区间。
+          <b>区级口径为第三方挂牌均价代理，全部为低置信度，不是官方成交价。</b>
+        </p>
+      </div>
+      <div class="card">
+        <div id="chart-district" class="chart tall" role="img" aria-label="北京 17 区挂牌价情景"></div>
+        <p class="footnote">
+          数据源：2025-01 – 2026-06 月度挂牌均价（10 个核心城区）；其余城区为代理基准。方法细节见项目报告
+          <code>reports/district_price_forecast_2026_2030.md</code>。
+        </p>
+      </div>
+    </section>
+
+    <!-- ================= 8. District listing sparklines ================= -->
+    <section id="listing">
+      <div class="section-head">
+        <h2>北京核心区挂牌均价走势</h2>
+        <p>2025-01 → 2026-06 月度挂牌均价（元/㎡）。样本期内的累计变化，不代表预测。</p>
+      </div>
+      <div class="card">
+        <div id="district-sparks" class="spark-grid"></div>
+        <p class="footnote">第三方挂牌均价（creprice 月报），与官方成交口径不同，仅作走势参考。</p>
+      </div>
+    </section>
+
+    <!-- ================= 9. Macro: LPR ================= -->
+    <section id="macro">
+      <div class="section-head">
+        <h2>宏观背景：LPR 下调</h2>
+        <p>五年期以上 LPR 从 4.85% 一路降至 3.5%（2019-08 → 2026-07），是理解房价下行的重要宏观背景。</p>
+      </div>
+      <div class="card">
+        <div id="chart-lpr" class="chart short" role="img" aria-label="LPR 历史"></div>
+        <p class="footnote">数据源：中国人民银行贷款市场报价利率（LPR）公告归档。</p>
+      </div>
+    </section>
+
+    <!-- ================= 10. Methodology & papers ================= -->
+    <section id="papers">
+      <div class="section-head">
+        <h2>论文与报告</h2>
+        <p>本 demo 的数据、方法与数字全部来自以下可复现资产。</p>
+      </div>
+      <div class="card">
+        <ul class="method-list">
+          <li><b>数据方法论</b> —《可测量与不可测量：中国房价数据的一种来源—口径感知构建方法（以北京为区级案例）》v0.4</li>
+          <li><b>预测论文</b> —《未来五年中国二手住宅价格：一种可解释组合预测方法及其驻底分析（2026—2030）》v0.2</li>
+          <li><b>五年预测报告</b> — 方法、权重与情景的完整推导</li>
+          <li><b>区级预测报告</b> — 北京 / 重庆 43 个区县的情景预测</li>
+          <li><b>评审记录</b> — 预测论文 v0.1 → v0.2 的自查与修正</li>
+        </ul>
+        <div class="links-row">
+          <a href="https://github.com/Liyuk/cn-housing-price-training" target="_blank" rel="noopener">GitHub 仓库</a>
+          <a href="https://github.com/Liyuk/cn-housing-price-training/blob/main/docs/paper-china-housing-price-data-methods.md" target="_blank" rel="noopener">数据方法论文</a>
+          <a href="https://github.com/Liyuk/cn-housing-price-training/blob/main/docs/paper-five-year-housing-price-forecast.md" target="_blank" rel="noopener">预测论文</a>
+          <a href="https://github.com/Liyuk/cn-housing-price-training/blob/main/reports/five_year_forecast_2026_2030.md" target="_blank" rel="noopener">五年预测报告</a>
+        </div>
+      </div>
+    </section>
+
+    <footer class="site-foot">
+      <span>cn-housing-price-training · 交互式 demo</span>
+      <span id="foot-note">数据截至 2026-06 · 预测至 2031-06</span>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
