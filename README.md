@@ -2,7 +2,9 @@
 
 这是一个可重复运行的基线项目：从国家统计局公开月报采集 70 个大中城市的新建住宅和二手住宅价格指数，整理为训练数据，并用随机森林预测二手住宅同比指数。
 
-**数据方法论文：** [可测量与不可测量：中国房价数据的一种来源—口径感知构建方法（以北京为区级案例）](docs/paper-china-housing-price-data-methods.md)（v0.3, preprint）
+**数据方法论文：** [可测量与不可测量：中国房价数据的一种来源—口径感知构建方法（以北京为区级案例）](docs/paper-china-housing-price-data-methods.md)（v0.4, preprint）
+
+**预测论文：** [未来五年中国二手住宅价格：一种可解释组合预测方法及其驻底分析（2026—2030）](docs/paper-five-year-housing-price-forecast.md)（v0.1, preprint）
 
 ## 数据口径
 
