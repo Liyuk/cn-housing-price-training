@@ -783,6 +783,37 @@ function bindThemeToggle() {
   btn.addEventListener("click", () => setTheme(!isDark()));
 }
 
+/* ---------- 口径说明 modal ---------- */
+function bindDefsModal() {
+  const backdrop = document.getElementById("defs-backdrop");
+  const openBtn = document.getElementById("defs-open");
+  const closeBtn = document.getElementById("defs-close");
+  const okBtn = document.getElementById("defs-ok");
+  if (!backdrop || !openBtn) return;
+
+  function show() {
+    backdrop.hidden = false;
+    document.body.style.overflow = "hidden";
+    const focusTarget = closeBtn || openBtn;
+    if (focusTarget) focusTarget.focus();
+  }
+  function hide() {
+    backdrop.hidden = true;
+    document.body.style.overflow = "";
+    openBtn.focus();
+  }
+
+  openBtn.addEventListener("click", show);
+  closeBtn.addEventListener("click", hide);
+  okBtn.addEventListener("click", hide);
+  backdrop.addEventListener("click", (e) => {
+    if (e.target === backdrop) hide();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !backdrop.hidden) hide();
+  });
+}
+
 /* ---------- boot ---------- */
 async function boot() {
   try {
@@ -834,6 +865,7 @@ async function boot() {
   renderCirea();
   renderOfficialTotal();
   bindThemeToggle();
+  bindDefsModal();
   bindCityPicker();
   bindSegButtons();
   bindMacroPicker();

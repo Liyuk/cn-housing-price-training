@@ -25,6 +25,7 @@
       <div class="meta-row">
         <span id="coverage-note"></span>
         <span>模型输出 = 官方价格指数，不是每平方米成交价</span>
+        <button class="defs-button" id="defs-open" type="button">口径说明</button>
       </div>
     </header>
 
@@ -275,6 +276,42 @@
       <span>cn-housing-price-training · 交互式 demo</span>
       <span id="foot-note">数据截至 2026-06 · 预测至 2031-06</span>
     </footer>
+  </div>
+
+  <!-- 口径说明 弹层 -->
+  <div class="modal-backdrop" id="defs-backdrop" hidden>
+    <div class="modal" id="defs-modal" role="dialog" aria-modal="true" aria-labelledby="defs-title">
+      <div class="modal-head">
+        <h2 id="defs-title">口径说明</h2>
+        <button class="modal-close" id="defs-close" type="button" aria-label="关闭">×</button>
+      </div>
+      <div class="modal-body">
+        <section>
+          <h3>价格指数 ≠ 房价</h3>
+          <p>本 demo 全部城市级数据是<b>价格指数</b>（环比 = 上月 100；同比 = 上年同月 100），不是每平方米成交单价。指数 100 = 持平，低于 100 = 下跌。不能把"指数下跌 10%"读作"房价跌了 10%"。</p>
+        </section>
+        <section>
+          <h3>来源与口径标记</h3>
+          <p>每个单元格都带 <code>methodology</code> 标记（<code>current</code> = 现行《住宅销售价格统计调查方案》；<code>current_cirea_legacy_doc</code> / <code>current_cirea</code> = CIREA 历史文档转载）。2008–2010 旧口径"房屋销售价格指数"未包含在本面板。建模时两段口径分开评估，不把口径变化误判为市场变化。</p>
+        </section>
+        <section>
+          <h3>区级数据：挂牌代理，非官方成交价</h3>
+          <p>北京/重庆区县价格来自<b>第三方挂牌均价</b>（creprice 月报）或代理基准，均标注 <code>low</code>/<code>medium</code> 置信度。官方口径仅有北京市住建委网签套数/面积（2025-10 快照），不含成交单价。挂牌价 ≠ 成交价，区间不代表概率分布。</p>
+        </section>
+        <section>
+          <h3>宏观数据：累计口径</h3>
+          <p>宏观面板（开发投资、新开工、竣工、销售、待售、到位资金）为<b>年初累计口径</b>的同比，来源为国家统计局房地产数据月报。同比 0 线以上为扩张、以下为收缩。</p>
+        </section>
+        <section>
+          <h3>预测的性质</h3>
+          <p>五年预测是<b>纯价格时间序列的动量外推</b>（可解释三成分组合），不纳入政策、宏观基本面等外生变量。低/基准/高区间按历史 5 年实际波动宽度锚定，<b>不是概率分布</b>；模型无法内生预测"底"。完整推导见论文与报告。</p>
+        </section>
+      </div>
+      <div class="modal-foot">
+        <a href="https://github.com/Liyuk/cn-housing-price-training/blob/main/docs/paper-china-housing-price-data-methods.md" target="_blank" rel="noopener">数据方法论文</a>
+        <button id="defs-ok" type="button">我知道了</button>
+      </div>
+    </div>
   </div>
 
   <script src="app.js"></script>
