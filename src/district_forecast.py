@@ -224,7 +224,7 @@ def write_markdown_report(result: pd.DataFrame, evidence: dict[str, dict[str, ob
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data", default="data/processed/housing_indices_clean_v2.csv")
+    parser.add_argument("--data", default="data/processed/housing_indices_clean_v3.csv")
     parser.add_argument("--baselines", default="data/processed/district_price_baselines.csv")
     parser.add_argument("--output", default="data/processed/district_price_forecast_2026_2030.csv")
     parser.add_argument("--evidence", default="reports/district_forecast_model_selection.json")

@@ -54,7 +54,7 @@ def write_importance(data_path: str, output_path: str, test_months: int = 1, n_r
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data", default="data/processed/housing_indices_clean_v2.csv")
+    parser.add_argument("--data", default="data/processed/housing_indices_clean_v3.csv")
     parser.add_argument("--output", default="reports/permutation_importance_v3.json")
     parser.add_argument("--test-months", type=int, default=1)
     parser.add_argument("--repeats", type=int, default=10)

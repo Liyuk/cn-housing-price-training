@@ -2,27 +2,27 @@
   "北京": {
     "method": "mean_reversion",
     "rolling_12m_mae_index_points": {
-      "mean12": 0.566389,
-      "mean24": 0.587917,
-      "mean_reversion": 0.533783,
-      "seasonal_naive": 0.758333
+      "mean12": 0.669136,
+      "mean24": 0.677623,
+      "mean_reversion": 0.638201,
+      "seasonal_naive": 0.903704
     },
     "history_start": "2019-01-01",
     "history_end": "2026-06-01",
     "latest_month_on_month": 100.1,
-    "trailing_12m_mean": 99.54166666666667
+    "trailing_12m_mean": 99.53333333333332
   },
   "重庆": {
     "method": "mean_reversion",
     "rolling_12m_mae_index_points": {
-      "mean12": 0.511667,
-      "mean24": 0.497361,
-      "mean_reversion": 0.481704,
-      "seasonal_naive": 0.56
+      "mean12": 0.466358,
+      "mean24": 0.462423,
+      "mean_reversion": 0.453159,
+      "seasonal_naive": 0.530556
     },
     "history_start": "2019-01-01",
     "history_end": "2026-06-01",
     "latest_month_on_month": 100.1,
-    "trailing_12m_mean": 99.39999999999999
+    "trailing_12m_mean": 99.59999999999998
   }
 }

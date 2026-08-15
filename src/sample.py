@@ -34,7 +34,7 @@ def sample_panel(data, cities: Optional[Iterable[str]] = None, markets: Optional
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", default="data/processed/housing_indices_clean_v2.csv")
+    parser.add_argument("--input", default="data/processed/housing_indices_clean_v3.csv")
     parser.add_argument("--output", default="data/samples/housing_panel_sample.csv")
     parser.add_argument("--cities", nargs="*", default=["北京", "上海", "重庆", "深圳"])
     parser.add_argument("--markets", nargs="*", default=["new", "secondhand"])

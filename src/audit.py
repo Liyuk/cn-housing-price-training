@@ -66,7 +66,7 @@ def write_audit(data_path: str, output_path: str, start_month: Optional[str] = N
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data", default="data/processed/housing_indices_clean_v2.csv")
+    parser.add_argument("--data", default="data/processed/housing_indices_clean_v3.csv")
     parser.add_argument("--output", default="reports/data_quality_v2.json")
     parser.add_argument("--start-month")
     parser.add_argument("--end-month")

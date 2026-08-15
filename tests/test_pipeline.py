@@ -6,7 +6,7 @@ import tempfile
 from src.collector import normalize_city, parse_index_tables
 from src.cirea_sources import parse_cirea_tables, parse_cirea_text
 from src.clean import clean_price_data
-from src.beijing_sources import parse_beijing_stats
+from src.beijing_sources import parse_beijing_stats, parse_annual_transactions
 from src.local_report import build_district_relationship_report
 from src.evaluate import split_time_holdout
 from src.macro_sources import parse_lpr, parse_real_estate_metrics
@@ -218,6 +218,31 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(len(rows), 2)
         self.assertEqual(rows[0]["district"], "朝阳")
         self.assertEqual(rows[0]["online_signing_count"], 20.0)
+
+    def test_parse_beijing_annual_transactions_order(self):
+        html = """
+        <li class="tab2 tab_y"><a href="">2020-2024年我市新建商品房网签情况</a></li>
+        <li class="tab2 tab_n"><a href="">2020-2024年我市存量房交易情况</a></li>
+        <div class="jwnWqTjCont tab2_x tab_x_y">
+        <table>
+          <tr><td>时间</td><td>住宅套数</td><td>住宅面积</td><td>非住宅面积</td></tr>
+          <tr><td>2020年</td><td>6.81</td><td>765.47</td><td>389.92</td></tr>
+        </table>
+        </div>
+        <div class="jwnWqTjCont tab2_x tab_x_n">
+        <table>
+          <tr><td>时间</td><td>住宅套数</td><td>住宅面积</td><td>非住宅面积</td></tr>
+          <tr><td>2020年</td><td>16.46</td><td>1478.8</td><td>95.7</td></tr>
+        </table>
+        </div>
+        """
+        rows = parse_annual_transactions(html, "https://example.test")
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]["market"], "new")
+        self.assertEqual(rows[0]["residential_units_wan"], 6.81)
+        self.assertEqual(rows[1]["market"], "secondhand")
+        self.assertEqual(rows[1]["residential_units_wan"], 16.46)
+
 
     def test_district_relationship_report_explains_missing_price(self):
         import pandas as pd
