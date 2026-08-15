@@ -46,6 +46,12 @@ python3 -m venv .venv
 
 北京区级价格来源为 `creprice_sources.py` 采集的 2025-01 至 2026-06 月度挂牌均价面板（10 个核心城区 × 18 个月，`data/processed/creprice_beijing_district_prices.csv`），与既有 `district_price_sample.csv` 在共享月份完全一致。官方口径数据为北京市住建委 2025-10 区级网签（`beijing_district_transactions.csv`）与 2020—2024 年新建/存量年度交易（`beijing_annual_transactions.csv`），均保留来源分级标签。
 
+## 未来五年全国与北京预测（2026—2030）
+
+运行 `.venv/bin/python -m src.five_year_forecast` 可生成全国 70 城与北京的二手住宅价格指数五年预测，以及北京 17 区挂牌均价情景。完整数据见 `data/processed/five_year_index_paths.csv`（指数路径）与 `data/processed/five_year_forecast_2026_2030.csv`（区级情景），说明报告为 `reports/five_year_forecast_2026_2030.md`。
+
+方法：**短期动量 + 长期均值回归**的误差修正模型（Capozza et al. 2002；Case & Shiller 1989），全国与北京分别建模（回归速度由数据估计：全国半衰期 16.1 月、北京 1.9 月）。输出为**情景区间**（低/基准/高），区间幅度锚定历史 5 年实际波动。该模型是 `district_forecast.py` 的方法论升级——回归锚从"向 100"改为"向历史长期均值"，区间从固定偏移改为历史现实锚定。
+
 可接入的数据源、字段和口径边界见 [docs/data_sources.md](docs/data_sources.md)。
 
 训练集/测试集按城市分组切分，测试城市不会出现在训练集，以减少空间泄漏。当前样本量适合做教学和流程演示；如果要用于研究或投资决策，应继续补充完整月度历史、城市宏观变量和真实成交单价，并做时间滚动验证。
