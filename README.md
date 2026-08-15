@@ -2,6 +2,16 @@
 
 这是一个可重复运行的基线项目：从国家统计局公开月报采集 70 个大中城市的新建住宅和二手住宅价格指数，整理为训练数据，并用随机森林预测二手住宅同比指数。
 
+## 🖥️ 在线 Demo（GitHub Pages）
+
+**交互式预测看板：** <https://liyuk.github.io/cn-housing-price-training/>
+
+可视化内容包括：五年情景区间（低/基准/高）、可解释三成分的权重与分解、70 城分化热力图、单城走势、北京 17 区挂牌价情景，以及 LPR 宏观背景。所有图表均由仓库中的处理数据预生成（`site/data/*.json`），全静态、无后端。
+
+- 重新生成图表数据：`.venv/bin/python scripts/build_demo_data.py`
+- 本地预览：在 `site/` 目录下 `python3 -m http.server 8080`，访问 <http://localhost:8080>
+- 每次推送到 `main` 时，`deploy-demo.yml` 会自动重新构建并部署 `site/`（仅当 `site/**` 变化时触发）。
+
 **数据方法论文：** [可测量与不可测量：中国房价数据的一种来源—口径感知构建方法（以北京为区级案例）](docs/paper-china-housing-price-data-methods.md)（v0.4, preprint）
 
 **预测论文：** [未来五年中国二手住宅价格：一种可解释组合预测方法及其驻底分析（2026—2030）](docs/paper-five-year-housing-price-forecast.md)（v0.2, preprint）
