@@ -137,7 +137,10 @@ def _cirea_identity() -> dict:
     cirea = pd.concat(
         [read("cirea_secondhand_2019_2022.csv"), read("cirea_secondhand_2023.csv")]
     )
-    nbs = nbs[nbs["methodology"].eq("current_cirea_legacy_doc")]
+    # Both CIREA-marked methodologies cover the full 2019-2023 span: legacy doc
+    # rows (2019-2022) plus the 2023 current_cirea rows. Counting both matches
+    # the paper's 3,990 overlapping cells (not just the 3,150 legacy cells).
+    nbs = nbs[nbs["methodology"].isin(["current_cirea_legacy_doc", "current_cirea"])]
     merged = pd.merge(
         nbs[["month", "city", "market", "yoy"]],
         cirea[["month", "city", "market", "yoy"]],
