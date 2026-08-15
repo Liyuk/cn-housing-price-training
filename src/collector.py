@@ -176,6 +176,51 @@ def discover_urls(start_year: int = 2015, end_year: int = 2026, max_pages: int =
     return dict(sorted(found.items()))
 
 
+REAL_ESTATE_TITLE = "全国房地产市场基本情况"
+
+
+def discover_real_estate_urls(start_year: int = 2019, end_year: int = 2026, max_pages: int = 260) -> Dict[str, str]:
+    """Crawl the release directory and find monthly national real-estate reports.
+
+    Unlike the 70-city reports, these links carry no ``title`` attribute, so we
+    match on the visible link text: "20xx年M—N月份全国房地产市场基本情况".
+    No early-exit is used here: the report is released on a non-monthly cadence
+    (January and December data are usually published elsewhere), so skipping
+    pages would silently drop valid months.
+    """
+    found: Dict[str, str] = {}
+    for page in range(max_pages):
+        page_url = INDEX_URL if page == 0 else INDEX_URL.replace(".html", f"_{page}.html")
+        try:
+            content = fetch(page_url)
+        except Exception:
+            continue
+        for href, text in re.findall(r"<a[^>]+href=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>", content, re.S):
+            text = html_lib.unescape(re.sub(r"\s+", "", re.sub(r"<[^>]+>", "", text)))
+            # "20xx年M—N月份全国房地产市场基本情况" (normal month)
+            match = re.search(r"(20\d{2})年(\d{1,2})—(\d{1,2})月份" + re.escape(REAL_ESTATE_TITLE), text)
+            if not match:
+                # "20xx年上半年全国房地产市场基本情况" (H1 special title)
+                match = re.search(r"(20\d{2})年上半年" + re.escape(REAL_ESTATE_TITLE), text)
+                if match:
+                    year = int(match.group(1))
+                    if start_year <= year <= end_year:
+                        found[f"{year:04d}-06"] = urljoin(page_url, href)
+                    continue
+                continue
+            year = int(match.group(1))
+            end_month = int(match.group(3))
+            if start_year <= year <= end_year:
+                found[f"{year:04d}-{end_month:02d}"] = urljoin(page_url, href)
+        # Stop when several consecutive pages return no new reports and we've
+        # reached pages deep enough that older reports would have been found.
+        if page > 40 and len(found) > 0:
+            old = min(int(k[:4]) for k in found)
+            if old <= start_year:
+                break
+    return dict(sorted(found.items()))
+
+
 def collect(output: str, urls: Dict[str, str] = URLS) -> int:
     os.makedirs(os.path.dirname(output) or ".", exist_ok=True)
     all_records: List[Dict[str, object]] = []

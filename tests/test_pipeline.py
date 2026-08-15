@@ -58,6 +58,12 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(result["lpr_1y"], 3.45)
         self.assertEqual(result["lpr_5y"], 3.95)
 
+    def test_parse_lpr_handles_spaced_labels_from_older_announcements(self):
+        text = "中国人民银行授权全国银行间同业拆借中心公布，2023年2月20日贷款市场报价利率（LPR）为：1 年期 LPR 为 3.65%，5 年期以上 LPR 为 4.3%。"
+        result = parse_lpr(text, "2023-02", "https://example.test")
+        self.assertEqual(result["lpr_1y"], 3.65)
+        self.assertEqual(result["lpr_5y"], 4.3)
+
     def test_parse_real_estate_metrics_extracts_national_values(self):
         text = "房地产开发投资完成额 10000 亿元，其中：住宅投资 8000 亿元；房屋施工面积 50000 万平方米；房屋新开工面积 20000 万平方米；房屋竣工面积 15000 万平方米；新建商品房销售面积 20000 万平方米，下降5.0%；新建商品房销售额 18000 亿元，下降8.0%；商品房待售面积 30000 万平方米；房地产开发企业到位资金 12000 亿元。"
         result = parse_real_estate_metrics(text, "2024-01", "https://example.test")
@@ -66,6 +72,19 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(result["inventory_area"], 30000.0)
         self.assertEqual(result["new_home_sales_area"], 20000.0)
         self.assertEqual(result["new_home_sales_value"], 18000.0)
+
+    def test_parse_real_estate_metrics_extracts_yoy_signs(self):
+        text = ("1—6月份，全国房地产开发投资 38074 亿元，同比下降 18.0%；其中，住宅投资 29300 亿元，下降 17.8%。"
+                "房屋新开工面积 23239 万平方米，下降 23.4%。新建商品房销售额 37945 亿元，下降 13.6%。"
+                "商品房待售面积 76315 万平方米，同比下降 0.9%。房地产开发企业到位资金 40233 亿元，同比下降 20.2%。"
+                "商品房销售面积 66563 万平方米，同比增长 6.5%。")
+        result = parse_real_estate_metrics(text, "2024-01", "https://example.test")
+        self.assertEqual(result["development_investment_yoy"], -18.0)
+        self.assertEqual(result["new_starts_area_yoy"], -23.4)
+        self.assertEqual(result["new_home_sales_value_yoy"], -13.6)
+        self.assertEqual(result["inventory_area_yoy"], -0.9)
+        self.assertEqual(result["new_home_sales_area_yoy"], 6.5)
+        self.assertEqual(result["developer_funding_yoy"], -20.2)
 
     def test_load_features_can_join_monthly_macro_features(self):
         with tempfile.TemporaryDirectory() as directory:

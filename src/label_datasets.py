@@ -8,6 +8,7 @@ from src.source_labels import label_csv
 FILES = [
     "data/processed/housing_indices_clean_v3.csv",
     "data/processed/macro_features.csv",
+    "data/processed/lpr_history.csv",
     "data/processed/district_price_sample.csv",
     "data/processed/beijing_district_transactions.csv",
     "data/processed/beijing_official_district_secondhand_2025_10.csv",

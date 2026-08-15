@@ -21,6 +21,10 @@ def classify_source(row: Dict[str, str]) -> Dict[str, object]:
         tier = "A_official"
         source_class = "government_statistics_or_registry"
         is_official = True
+    elif "pbc.gov.cn" in url:
+        tier = "A_official"
+        source_class = "central_bank_monetary_policy"
+        is_official = True
     elif "zjw.beijing.gov.cn" in url or "zfcxjw.cq.gov.cn" in url:
         tier = "A_official"
         source_class = "government_housing_transaction"
@@ -42,6 +46,10 @@ def classify_source(row: Dict[str, str]) -> Dict[str, object]:
         price_basis = "listing_price"
         is_transaction_price = False
         training_role = "exploratory_only"
+    elif "central_bank_monetary_policy" in source_class or "lpr" in url:
+        price_basis = "policy_interest_rate"
+        is_transaction_price = False
+        training_role = "macro_financing_cost"
     elif "online_signing" in methodology or "网签" in methodology:
         price_basis = "transaction_volume_area"
         is_transaction_price = False
@@ -61,6 +69,8 @@ def classify_source(row: Dict[str, str]) -> Dict[str, object]:
 
     if tier == "A_official" and "online_signing" in methodology:
         notes = "官方网签成交量/面积；不等于成交单价"
+    elif tier == "A_official" and "central_bank_monetary_policy" in source_class:
+        notes = "央行货币政策利率；融资成本变量，不是房价"
     elif tier == "A_official":
         notes = "官方统计；需按指标定义使用"
     elif tier == "B_industry_index":

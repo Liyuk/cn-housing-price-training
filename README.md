@@ -18,6 +18,8 @@ python3 -m venv .venv
 .venv/bin/python -m unittest discover -s tests -v
 .venv/bin/python -m src.collector --start-year 2008 --end-year 2026
 .venv/bin/python -m src.macro_sources --lpr-month 2024-04 --lpr-url '<PBOC-LPR-URL>' --real-estate-month 2025-11 --real-estate-url '<NBS-REAL-ESTATE-URL>'
+.venv/bin/python -m src.macro_sources --lpr-history --start-year 2019 --end-year 2026 --output data/processed/lpr_history.csv
+.venv/bin/python -m src.macro_history --urls /tmp/nbs_real_estate_urls.json --output data/processed/macro_features_history.csv --existing data/processed/macro_features.csv --merge-output data/processed/macro_features_full.csv --lpr data/processed/lpr_history.csv
 .venv/bin/python -m src.cirea_sources --input data/raw/cirea/secondhand_2023.docx --year 2023 --output data/processed/cirea_secondhand_2023.csv --source-url 'https://www.cirea.org.cn/content/4773'
 .venv/bin/python -m src.creprice_sources --city 北京 --start 2025-01 --end 2026-06 --output data/processed/creprice_beijing_district_prices.csv
 .venv/bin/python -m src.beijing_sources --output data/processed/beijing_district_transactions.csv --annual-output data/processed/beijing_annual_transactions.csv
@@ -31,6 +33,8 @@ python3 -m venv .venv
 ```
 
 输出：清洗后的价格面板、模型比较、全国分析报告和北京区级网签分析报告。城市级面板 `housing_indices_clean_v3.csv` 已补齐 2024 全年、2025 年 2—11 月、2026 年 1—4 月，以及 2022 年 10—12 月（来自国家统计局 xxgk 归档路径）；北京二手住宅同比序列已连续覆盖 2019-01 至 2026-06（90 个月、无缺口）。新建住宅指数覆盖 2022-10 起与 2023 年 1、8—12 月及 2024-01 之后；2023 年 2—7 月新建缺口仍需补充历史归档页。
+
+全国宏观面板 `macro_features.csv` 已补齐为 35 个月（2023-02 至 2026-06，累计口径），包含房地产开发投资、施工/新开工/竣工面积、商品房销售面积/金额、待售面积、到位资金及其同比，以及 LPR。LPR 完整序列（`lpr_history.csv`，2019-08 至 2026-07，84 个月）来自央行公告归档，含空格格式公告的兼容解析。
 
 ## 北京/重庆区级五年预测
 

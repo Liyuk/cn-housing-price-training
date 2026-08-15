@@ -3,8 +3,8 @@ nbs_70city,NBS 70-city housing price index,city,new;secondhand,monthly,month_on_
 cirea_70city,CIREA secondhand housing index,city,secondhand,monthly,month_on_month;yoy;year_avg,public_docx,2,Public historical attachments;methodology must be retained
 beijing_housing_commission,Beijing housing commission district transactions,district,secondhand,monthly,online_signing_count;online_signing_area_m2,public_html,1,Public district transaction statistics;not unit price
 chongqing_stats,Chongqing statistics bureau,city;district,monthly;annual,sales;investment;population;construction,public_html;pdf,1,Official statistics;availability varies by year
-nbs_real_estate,NBS national real estate indicators,national,all,monthly,investment;sales_area;sales_value;starts;completions,public_html,1,Macro and supply-demand controls
-pboc_lpr,People's Bank loan prime rate,national,all,monthly,lpr_1y;lpr_5y,public_html,1,Financing cost control
+nbs_real_estate,NBS national real estate indicators,national,all,monthly,investment;sales_area;sales_value;starts;completions;inventory;yoy,public_html,1,Macro and supply-demand controls;full panel 2023-02..2026-06 (35 cumulative months)
+pboc_lpr,People's Bank loan prime rate,national,all,monthly,lpr_1y;lpr_5y,public_html,1,Financing cost control;full series 2019-08..2026-07 (84 months)
 land_market,China land market and local public resource platforms,city;district,all,monthly;event,land_sale_price;floor_area_ratio;premium_rate,public_html,2,Requires city-specific source mapping
 casdc_yangtze_delta,CASDC Yangtze River Delta housing dataset,city;district,all,annual,house_price,public_download,3,Historical open research dataset 2008-2018;scope limited
 beike_open,Beike open platform,city;district,all,irregular,commercial data products,partnership_or_authorization,4,Not assumed to be free bulk download
