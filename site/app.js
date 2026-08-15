@@ -153,7 +153,19 @@ function fanChart(region) {
   const low = new Array(gap).fill(null).concat(data.forecast.map((d) => d.low));
   const band = new Array(gap).fill(null).concat(data.forecast.map((d) => d.high - d.low));
   const base = new Array(gap).fill(null).concat(data.forecast.map((d) => d.base));
-  const histPad = months.concat(new Array(fcMonths.length).fill(null));
+  // History line: numeric index values for the history window, null in the
+  // forecast window so the line ends at the anchor (2026-06).
+  const histPad = histVals.concat(new Array(fcMonths.length).fill(null));
+
+  // Y-domain must span BOTH the history (higher levels) and the forecast fan
+  // (lower levels). With no explicit domain ECharts auto-zooms to the forecast
+  // band and clips the history line off the top of the plot.
+  const allVals = data.history.map((d) => d.v).concat(
+    data.forecast.flatMap((d) => [d.base, d.low, d.high])
+  );
+  const yMin = Math.min(...allVals);
+  const yMax = Math.max(...allVals);
+  const yPad = (yMax - yMin) * 0.08;
 
   return {
     grid: baseGrid(),
@@ -182,13 +194,15 @@ function fanChart(region) {
       boundaryGap: false,
       axisLabel: {
         color: C.secondary, fontSize: 11,
-        interval: (idx, value) => value.endsWith("-01") || value.endsWith("-07"),
+        // Label only each January, so each year appears once.
+        interval: (idx, value) => value.endsWith("-01"),
         formatter: (v) => v.slice(0, 4),
       },
     }),
     yAxis: baseAxis({
       type: "value",
-      scale: true,
+      min: yMin - yPad,
+      max: yMax + yPad,
       axisLabel: { color: C.secondary, fontSize: 11 },
     }),
     series: [
@@ -322,8 +336,14 @@ function cityLineChart(city) {
 function componentChart(region) {
   const rows = COMP[region];
   const months = rows.map((r) => r.m);
-  const stack = rows.map((r) => r.trend + r.reversion + r.season);
-  const fill = new Array(rows.length).fill(null);
+
+  // The three components share the same ~100 MoM-index scale, so they are
+  // drawn as separate lines, NOT stacked (stacking would sum them to ~298 on
+  // the y-axis). The "加权和" is the true weighted forecast = r.base.
+  const allVals = rows.flatMap((r) => [r.trend, r.reversion, r.season, r.base]);
+  const yMin = Math.min(...allVals);
+  const yMax = Math.max(...allVals);
+  const yPad = Math.max((yMax - yMin) * 0.15, 0.1);
 
   return {
     grid: baseGrid(),
@@ -340,7 +360,7 @@ function componentChart(region) {
       },
     }),
     legend: {
-      data: ["趋势延续", "均值回归", "季节性"],
+      data: ["趋势延续", "均值回归", "季节性", "加权和"],
       top: 0, left: 0,
       textStyle: { color: C.secondary, fontSize: 12 },
       itemWidth: 14, itemHeight: 8,
@@ -355,30 +375,29 @@ function componentChart(region) {
     }),
     yAxis: baseAxis({
       type: "value",
+      min: yMin - yPad,
+      max: yMax + yPad,
       axisLabel: { color: C.secondary, fontSize: 11 },
     }),
     series: [
       {
-        name: "趋势延续", type: "line", stack: "comp",
+        name: "趋势延续", type: "line",
         data: rows.map((r) => r.trend), showSymbol: false,
         lineStyle: { width: 1.5, color: C.blue }, itemStyle: { color: C.blue },
-        areaStyle: { color: C.blue, opacity: 0.16 },
       },
       {
-        name: "均值回归", type: "line", stack: "comp",
+        name: "均值回归", type: "line",
         data: rows.map((r) => r.reversion), showSymbol: false,
         lineStyle: { width: 1.5, color: C.orange }, itemStyle: { color: C.orange },
-        areaStyle: { color: C.orange, opacity: 0.16 },
       },
       {
-        name: "季节性", type: "line", stack: "comp",
+        name: "季节性", type: "line",
         data: rows.map((r) => r.season), showSymbol: false,
         lineStyle: { width: 1.5, color: C.aqua }, itemStyle: { color: C.aqua },
-        areaStyle: { color: C.aqua, opacity: 0.16 },
       },
       {
         name: "加权和", type: "line",
-        data: stack, showSymbol: false,
+        data: rows.map((r) => r.base), showSymbol: false,
         lineStyle: { width: 2, color: C.primary, type: "dashed" },
         itemStyle: { color: C.primary },
       },
