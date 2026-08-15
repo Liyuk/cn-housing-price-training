@@ -156,21 +156,55 @@
       </div>
     </section>
 
-    <!-- ================= 7. Beijing district scenarios ================= -->
+    <!-- ================= 6b. New vs second-hand ================= -->
+    <section id="market-compare">
+      <div class="section-head">
+        <h2>新房 vs 二手住宅</h2>
+        <p>全国月度环比指数的均值对比。新房数据从 2022-10 起可用（2023 年 2—7 月为采集缺口），二手房覆盖 2019-01 起。</p>
+      </div>
+      <div class="card">
+        <div id="chart-compare" class="chart" role="img" aria-label="新房与二手住宅环比指数对比"></div>
+        <p class="footnote">纵轴为环比指数（上月 = 100），100 以下代表环比下跌。新房缺口月份不显示。</p>
+      </div>
+    </section>
+
+    <!-- ================= 7. Beijing/Chongqing district scenarios ================= -->
     <section id="districts">
       <div class="section-head">
-        <h2>北京 17 区挂牌价情景（2030 年末）</h2>
+        <h2>区县挂牌价情景（2030 年末）</h2>
         <p>
           将城市级官方指数路径投影到区级挂牌均价的基准上。柱为 2026 与 2030 基准，浅橙色条为 2030 低–高区间。
-          <b>区级口径为第三方挂牌均价代理，全部为低置信度，不是官方成交价。</b>
+          <b>区级口径为第三方挂牌均价代理，全部为低/中置信度，不是官方成交价。</b>
         </p>
       </div>
       <div class="card">
-        <div id="chart-district" class="chart tall" role="img" aria-label="北京 17 区挂牌价情景"></div>
+        <div class="filters">
+          <span class="filter-label">城市</span>
+          <div class="seg" data-district-city>
+            <button class="active" data-v="北京">北京 17 区</button>
+            <button data-v="重庆">重庆 26 区</button>
+          </div>
+        </div>
+        <div id="chart-district" class="chart tall" role="img" aria-label="区县挂牌价情景"></div>
         <p class="footnote">
-          数据源：2025-01 – 2026-06 月度挂牌均价（10 个核心城区）；其余城区为代理基准。方法细节见项目报告
-          <code>reports/district_price_forecast_2026_2030.md</code>。
+          北京区县数据源：2025-01 – 2026-06 月度挂牌均价；其余区县为代理基准。重庆 26 区县均为低置信度代理基准。
+          方法细节见 <code>reports/district_price_forecast_2026_2030.md</code>。
         </p>
+      </div>
+    </section>
+
+    <!-- ================= 7b. Official signings ================= -->
+    <section id="official">
+      <div class="section-head">
+        <h2>北京官方区级网签（2025-10）</h2>
+        <p>
+          北京市住建委区级二手住宅网签套数（合计 <span id="official-total">—</span> 套）。这是少数可验证的官方区级成交量数据，
+          与挂牌价代理互为补充。
+        </p>
+      </div>
+      <div class="card">
+        <div id="chart-official" class="chart short" role="img" aria-label="北京官方区级网签套数"></div>
+        <p class="footnote">来源：北京市住建委商品房交易公示平台，官方口径。</p>
       </div>
     </section>
 
@@ -186,20 +220,36 @@
       </div>
     </section>
 
-    <!-- ================= 9. Macro: LPR ================= -->
+    <!-- ================= 9. Macro ================= -->
     <section id="macro">
       <div class="section-head">
-        <h2>宏观背景：LPR 下调</h2>
-        <p>五年期以上 LPR 从 4.85% 一路降至 3.5%（2019-08 → 2026-07），是理解房价下行的重要宏观背景。</p>
+        <h2>宏观背景</h2>
+        <p>全国房地产开发投资同比从 2023-02 的 −5.7% 一路下探至 2026-06 的 −18.0%；商品房待售面积累计口径升至 7.63 亿㎡。</p>
       </div>
       <div class="card">
+        <div class="filters">
+          <span class="filter-label">指标</span>
+          <select class="city-picker" id="macro-picker" aria-label="选择宏观指标"></select>
+        </div>
+        <div id="chart-macro" class="chart" role="img" aria-label="宏观指标同比"></div>
+        <p class="footnote">累计口径同比（%）；来源：国家统计局房地产数据月报。虚线为同比零线。</p>
+      </div>
+      <div class="card" style="margin-top:16px">
         <div id="chart-lpr" class="chart short" role="img" aria-label="LPR 历史"></div>
-        <p class="footnote">数据源：中国人民银行贷款市场报价利率（LPR）公告归档。</p>
+        <p class="footnote">五年期以上 LPR 从 4.85% 降至 3.5%（2019-08 → 2026-07）。来源：中国人民银行 LPR 公告归档。</p>
       </div>
     </section>
 
     <!-- ================= 10. Methodology & papers ================= -->
     <section id="papers">
+      <div class="section-head">
+        <h2>数据可信度：行业指数 = 官方指数</h2>
+        <p>论文的一个核心发现：行业组织公开的历史二手住宅指数与官方数据逐格一致，即行业指数只是转载。</p>
+      </div>
+      <div class="cirea-callout" id="cirea-callout"></div>
+    </section>
+
+    <section id="sources">
       <div class="section-head">
         <h2>论文与报告</h2>
         <p>本 demo 的数据、方法与数字全部来自以下可复现资产。</p>

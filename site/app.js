@@ -33,9 +33,12 @@ let META = null;
 let FC = null; // forecast_series
 let COMP = null; // components
 let CITIES = null; // cities_yoy
-let DIST_SCEN = null; // district_scenarios
+let DIST_SCEN = null; // district_scenarios (per-city)
 let DIST_LIST = null; // district_listing
 let LPR = null; // lpr
+let MACRO = null; // macro panel
+let MCMP = null; // market_compare
+let OFFICIAL = null; // official signings
 let charts = [];
 
 function isDark() {
@@ -383,9 +386,9 @@ function componentChart(region) {
   };
 }
 
-/* ---------- section 5: Beijing district scenarios ---------- */
-function districtChart() {
-  const rows = DIST_SCEN.slice();
+/* ---------- section 5: district scenarios (北京 / 重庆) ---------- */
+function districtChart(city) {
+  const rows = (DIST_SCEN[city] || []).slice();
   const labels = rows.map((r) => r.district);
   return {
     grid: { left: 74, right: 30, top: 12, bottom: 36 },
@@ -526,6 +529,148 @@ function lprChart() {
   };
 }
 
+/* ---------- section 6b: macro panel with metric selector ---------- */
+function macroChart(metricKey) {
+  const months = MACRO.months;
+  const metric = MACRO.metrics.find((m) => m.key === metricKey) || MACRO.metrics[0];
+  const seriesData = MACRO.series[metric.key].map((v, i) => (v == null ? null : [months[i], v]));
+  return {
+    grid: Object.assign(baseGrid(), { right: 40 }),
+    tooltip: Object.assign(baseTooltip(true), {
+      formatter(params) {
+        const idx = params[0].dataIndex;
+        const m = months[idx];
+        const yoy = MACRO.series[metric.key][idx];
+        let lines = `<b>${m}</b><br/>${metric.label}：<b>${yoy == null ? "—" : yoy.toFixed(1) + "%"}</b>`;
+        const inv = MACRO.inventory_wan_m2[idx];
+        if (metric.key === "inventory_area_yoy" && inv != null) {
+          lines += `<br/>待售面积（累计口径）：<b>${inv.toFixed(2)} 亿㎡</b>`;
+        }
+        return lines;
+      },
+    }),
+    xAxis: baseAxis({
+      type: "category", data: months, boundaryGap: false,
+      axisLabel: { color: C.secondary, fontSize: 11, interval: 4 },
+    }),
+    yAxis: baseAxis({
+      type: "value", scale: true,
+      axisLabel: { color: C.secondary, fontSize: 11, formatter: "{value}%" },
+      name: "%（同比）", nameTextStyle: { color: C.muted, fontSize: 11 },
+    }),
+    series: [
+      {
+        name: metric.label, type: "line",
+        data: seriesData, showSymbol: false,
+        lineStyle: { width: 2, color: C.blue }, itemStyle: { color: C.blue },
+        markLine: {
+          symbol: "none",
+          lineStyle: { color: C.axis, type: "dashed" },
+          data: [{ yAxis: 0 }],
+          label: { show: false },
+        },
+      },
+    ],
+  };
+}
+
+/* ---------- section 6c: new vs second-hand comparison ---------- */
+function marketCompareChart() {
+  return {
+    grid: baseGrid(),
+    tooltip: Object.assign(baseTooltip(true), {
+      formatter(params) {
+        const idx = params[0].dataIndex;
+        const m = MCMP.months[idx];
+        let lines = `<b>${m}</b>`;
+        params.forEach((p) => {
+          if (p.value == null) return;
+          lines += `<br/>${p.marker}${p.seriesName}: <b>${Number(p.value).toFixed(1)}</b>`;
+        });
+        return lines;
+      },
+    }),
+    legend: {
+      data: ["新建住宅", "二手住宅"],
+      top: 0, left: 0,
+      textStyle: { color: C.secondary, fontSize: 12 },
+    },
+    xAxis: baseAxis({
+      type: "category", data: MCMP.months, boundaryGap: false,
+      axisLabel: {
+        color: C.secondary, fontSize: 11,
+        interval: (idx, v) => v.endsWith("-01"),
+        formatter: (v) => v.slice(0, 4),
+      },
+    }),
+    yAxis: baseAxis({
+      type: "value", scale: true,
+      axisLabel: { color: C.secondary, fontSize: 11 },
+    }),
+    series: [
+      {
+        name: "新建住宅", type: "line",
+        data: MCMP.new, showSymbol: false,
+        lineStyle: { width: 2, color: C.aqua }, itemStyle: { color: C.aqua },
+      },
+      {
+        name: "二手住宅", type: "line",
+        data: MCMP.secondhand, showSymbol: false,
+        lineStyle: { width: 2, color: C.blue }, itemStyle: { color: C.blue },
+      },
+    ],
+  };
+}
+
+/* ---------- section 6d: official Beijing signings ---------- */
+function officialChart() {
+  const rows = OFFICIAL.districts;
+  return {
+    grid: { left: 60, right: 24, top: 30, bottom: 36 },
+    tooltip: Object.assign(baseTooltip(true), {
+      formatter(params) {
+        const r = rows[params[0].dataIndex];
+        return `<b>${r.district}</b><br/>网签套数：<b>${r.count.toLocaleString("zh-CN")}</b><br/>面积：${r.area_m2.toLocaleString("zh-CN")} ㎡`;
+      },
+    }),
+    xAxis: baseAxis({
+      type: "category", data: rows.map((r) => r.district),
+      axisLabel: { color: C.secondary, fontSize: 11, interval: 0, rotate: 35 },
+    }),
+    yAxis: baseAxis({
+      type: "value",
+      axisLabel: { color: C.secondary, fontSize: 11 },
+    }),
+    series: [
+      {
+        name: "网签套数", type: "bar",
+        data: rows.map((r) => r.count),
+        barWidth: "55%",
+        itemStyle: { color: C.blue, borderRadius: [3, 3, 0, 0] },
+        label: { show: true, position: "top", fontSize: 10, color: C.secondary },
+      },
+    ],
+  };
+}
+
+/* ---------- CIREA identity callout ---------- */
+function renderCirea() {
+  const el = document.getElementById("cirea-callout");
+  if (!el) return;
+  const c = META.cirea;
+  el.innerHTML = `
+    <div class="cirea-stat"><span class="big">${c.overlap_cells.toLocaleString("zh-CN")}</span> 个重叠单元</div>
+    <div class="cirea-stat"><span class="big">r = ${c.r.toFixed(4)}</span> 相关系数</div>
+    <div class="cirea-stat"><span class="big">${c.max_abs_diff === 0 ? "0.0" : c.max_abs_diff}</span> 最大绝对差（指数点）</div>
+    <p class="cirea-note">${c.span} · 行业指数（CIREA 公开文档）与官方（国家统计局）二手住宅指数逐格一致 —— 行业指数是官方数据的转载，不是独立来源。这是论文"来源—口径感知构建"的核心发现。</p>
+  `;
+}
+
+function renderOfficialTotal() {
+  const el = document.getElementById("official-total");
+  if (el && OFFICIAL) el.textContent = OFFICIAL.total_units.toLocaleString("zh-CN");
+}
+
 /* ---------- weights panel ---------- */
 function renderWeights() {
   const weights = META.weights;
@@ -604,6 +749,35 @@ function bindSegButtons() {
   });
 }
 
+function bindMacroPicker() {
+  const select = document.getElementById("macro-picker");
+  if (!select) return;
+  MACRO.metrics.forEach((m) => {
+    const opt = document.createElement("option");
+    opt.value = m.key;
+    opt.textContent = m.label;
+    select.appendChild(opt);
+  });
+  select.addEventListener("change", () => {
+    const ch = charts.find((c) => c.name === "macro");
+    if (ch) ch.instance.setOption(macroChart(select.value), true);
+  });
+}
+
+function bindDistrictPicker() {
+  document.querySelectorAll(".seg[data-district-city]").forEach((seg) => {
+    seg.addEventListener("click", (e) => {
+      const btn = e.target.closest("button");
+      if (!btn || btn.classList.contains("active")) return;
+      seg.querySelectorAll("button").forEach((b) => b.classList.remove("active", "alt"));
+      btn.classList.add("active");
+      const city = btn.dataset.v;
+      const ch = charts.find((c) => c.name === "district");
+      if (ch) ch.instance.setOption(districtChart(city), true);
+    });
+  });
+}
+
 function bindThemeToggle() {
   const btn = document.getElementById("theme-toggle");
   btn.addEventListener("click", () => setTheme(!isDark()));
@@ -633,7 +807,7 @@ async function boot() {
   }
 
   try {
-    [META, FC, COMP, CITIES, DIST_SCEN, DIST_LIST, LPR] = await Promise.all([
+    [META, FC, COMP, CITIES, DIST_SCEN, DIST_LIST, LPR, MACRO, MCMP, OFFICIAL] = await Promise.all([
       loadJson("meta.json"),
       loadJson("forecast_series.json"),
       loadJson("components.json"),
@@ -641,6 +815,9 @@ async function boot() {
       loadJson("district_scenarios.json"),
       loadJson("district_listing.json"),
       loadJson("lpr.json"),
+      loadJson("macro.json"),
+      loadJson("market_compare.json"),
+      loadJson("official.json"),
     ]);
   } catch (e) {
     document.getElementById("boot-error").textContent =
@@ -654,9 +831,13 @@ async function boot() {
   renderHero();
   renderWeights();
   renderSparks();
+  renderCirea();
+  renderOfficialTotal();
   bindThemeToggle();
   bindCityPicker();
   bindSegButtons();
+  bindMacroPicker();
+  bindDistrictPicker();
 
   // charts (named so filters can target them)
   register(document.getElementById("chart-fan"), "fan", () => fanChart("全国"));
@@ -669,8 +850,14 @@ async function boot() {
     cityLineChart(document.getElementById("city-picker").value || CITIES.cities[0])
   );
   register(document.getElementById("chart-component"), "component", () => componentChart("全国"));
-  register(document.getElementById("chart-district"), "district", districtChart);
+  register(document.getElementById("chart-district"), "district", () => districtChart("北京"));
   register(document.getElementById("chart-lpr"), "lpr", lprChart);
+  register(document.getElementById("chart-macro"), "macro", () => {
+    const sel = document.getElementById("macro-picker");
+    return macroChart(sel ? sel.value : "development_investment_yoy");
+  });
+  register(document.getElementById("chart-compare"), "compare", marketCompareChart);
+  register(document.getElementById("chart-official"), "official", officialChart);
 }
 
 document.addEventListener("DOMContentLoaded", boot);

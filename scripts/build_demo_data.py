@@ -13,13 +13,16 @@ Usage:
     .venv/bin/python scripts/build_demo_data.py
 
 Outputs (all written to site/data/):
-    meta.json                     headline numbers, weights, coverage
+    meta.json                     headline numbers, weights, coverage, CIREA identity check
     forecast_series.json          historical + forecast fan for 全国 / 北京
     components.json               trend/reversion/season per region per month
     cities_yoy.json               second-hand YoY matrix for the city heatmap
-    district_scenarios.json       Beijing 17-district 2026→2030 scenarios
+    district_scenarios.json       Beijing 17 / Chongqing 26 district 2026→2030 scenarios
     district_listing.json         Beijing 10-district listing price panel
     lpr.json                      LPR history
+    macro.json                    national macro panel (investment, starts, sales, inventory)
+    market_compare.json           new vs second-hand national MoM comparison
+    official.json                 Beijing official 2025-10 district signings
 """
 
 from __future__ import annotations
@@ -119,6 +122,39 @@ def build_meta() -> dict:
             "national": round(float(np.prod(monthly_secondhand().to_numpy()[-60:] / 100.0) - 1.0) * 100.0, 1),
             "beijing": round(float(np.prod(monthly_secondhand(city="北京").to_numpy()[-60:] / 100.0) - 1.0) * 100.0, 1),
         },
+        "cirea": _cirea_identity(),
+    }
+
+
+def _cirea_identity() -> dict:
+    """Industry (CIREA) vs official (NBS) second-hand index identity check.
+
+    Both index series come from the same NBS source; CIREA's public historical
+    documents are a repost of the official numbers. The comparison quantifies
+    that claim over every overlapping cell.
+    """
+    nbs = read("housing_indices_clean_v3.csv")
+    cirea = pd.concat(
+        [read("cirea_secondhand_2019_2022.csv"), read("cirea_secondhand_2023.csv")]
+    )
+    nbs = nbs[nbs["methodology"].eq("current_cirea_legacy_doc")]
+    merged = pd.merge(
+        nbs[["month", "city", "market", "yoy"]],
+        cirea[["month", "city", "market", "yoy"]],
+        on=["month", "city", "market"],
+        suffixes=("_nbs", "_cirea"),
+    )
+    overlap = int(len(merged))
+    if overlap:
+        r = float(merged["yoy_nbs"].corr(merged["yoy_cirea"]))
+        max_diff = float((merged["yoy_nbs"] - merged["yoy_cirea"]).abs().max())
+    else:
+        r, max_diff = float("nan"), float("nan")
+    return {
+        "overlap_cells": overlap,
+        "r": round(r, 4),
+        "max_abs_diff": round(max_diff, 4),
+        "span": "2019-01 → 2023-12",
     }
 
 
@@ -199,24 +235,28 @@ def build_cities() -> dict:
 
 
 def build_district_scenarios() -> dict:
-    frame = read("five_year_forecast_2026_2030.csv")
-    frame = frame[frame["city"].eq("北京")]
-    base = frame[frame["year"].eq(2026)].set_index("district")["base_price_yuan_m2"]
-    end = frame[frame["year"].eq(2030)].set_index("district")
-    rows = []
-    for district in base.index:
-        rows.append(
-            {
-                "district": district,
-                "base2026": int(round(float(base.at[district]))),
-                "base2030": int(round(float(end.at[district, "price_base_yuan_m2"]))),
-                "low2030": int(round(float(end.at[district, "price_low_yuan_m2"]))),
-                "high2030": int(round(float(end.at[district, "price_high_yuan_m2"]))),
-                "confidence": str(end.at[district, "confidence"]),
-            }
-        )
-    rows.sort(key=lambda r: r["base2026"])
-    return rows
+    """Per-city district scenarios (北京 17 / 重庆 26) for the 2030 year-end."""
+    frame = read("district_price_forecast_2026_2030.csv")
+    result = {}
+    for city in ("北京", "重庆"):
+        city_frame = frame[frame["city"].eq(city)]
+        base = city_frame[city_frame["year"].eq(2026)].set_index("district")["base_price_yuan_m2"]
+        end = city_frame[city_frame["year"].eq(2030)].set_index("district")
+        rows = []
+        for district in base.index:
+            rows.append(
+                {
+                    "district": district,
+                    "base2026": int(round(float(base.at[district]))),
+                    "base2030": int(round(float(end.at[district, "price_base_yuan_m2"]))),
+                    "low2030": int(round(float(end.at[district, "price_low_yuan_m2"]))),
+                    "high2030": int(round(float(end.at[district, "price_high_yuan_m2"]))),
+                    "confidence": str(end.at[district, "confidence"]),
+                }
+            )
+        rows.sort(key=lambda r: r["base2026"])
+        result[city] = rows
+    return result
 
 
 def build_district_listing() -> dict:
@@ -253,6 +293,69 @@ def build_lpr() -> dict:
     ]
 
 
+def build_macro() -> dict:
+    """National macro panel: YoY % series + inventory level, 2023-02 → 2026-06."""
+    frame = read("macro_features_full.csv")
+    frame["month"] = pd.to_datetime(frame["month"])
+    frame = frame.sort_values("month")
+
+    metrics = [
+        ("development_investment_yoy", "房地产开发投资同比"),
+        ("new_starts_area_yoy", "新开工面积同比"),
+        ("completions_area_yoy", "竣工面积同比"),
+        ("new_home_sales_area_yoy", "商品房销售面积同比"),
+        ("new_home_sales_value_yoy", "商品房销售额同比"),
+        ("inventory_area_yoy", "商品房待售面积同比"),
+        ("developer_funding_yoy", "到位资金同比"),
+    ]
+    series = {
+        field: [None if pd.isna(v) else round(float(v), 1) for v in frame[field]]
+        for field, _ in metrics
+    }
+    months = [m.strftime("%Y-%m") for m in frame["month"]]
+    inventory = [None if pd.isna(v) else round(float(v) / 10000.0, 2) for v in frame["inventory_area"]]
+    return {
+        "months": months,
+        "metrics": [{"key": key, "label": label} for key, label in metrics],
+        "series": series,
+        "inventory_wan_m2": inventory,
+    }
+
+
+def build_market_compare() -> dict:
+    """National monthly mean MoM index for new vs second-hand, for comparison."""
+    frame = read("housing_indices_clean_v3.csv")
+    frame["month"] = pd.to_datetime(frame["month"])
+    months = []
+    new, secondhand = [], []
+    for m, sub in frame.groupby("month"):
+        months.append(m.strftime("%Y-%m"))
+        def mean_for(mkt):
+            vals = sub[sub["market"].eq(mkt)]["month_on_month"]
+            return round(float(vals.mean()), 2) if len(vals) else None
+        new.append(mean_for("new"))
+        secondhand.append(mean_for("secondhand"))
+    return {"months": months, "new": new, "secondhand": secondhand}
+
+
+def build_official() -> dict:
+    """Beijing official 2025-10 district second-hand signings."""
+    frame = read("beijing_official_district_secondhand_2025_10.csv")
+    frame = frame.sort_values("transaction_count", ascending=False)
+    return {
+        "month": "2025-10",
+        "total_units": int(round(frame["transaction_count"].sum())),
+        "districts": [
+            {
+                "district": row.district,
+                "count": int(round(row.transaction_count)),
+                "area_m2": round(float(row.transaction_area_m2), 0),
+            }
+            for row in frame.itertuples()
+        ],
+    }
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
 
@@ -264,6 +367,9 @@ def main() -> None:
         "district_scenarios.json": build_district_scenarios,
         "district_listing.json": build_district_listing,
         "lpr.json": build_lpr,
+        "macro.json": build_macro,
+        "market_compare.json": build_market_compare,
+        "official.json": build_official,
     }
 
     for name, fn in bundles.items():
