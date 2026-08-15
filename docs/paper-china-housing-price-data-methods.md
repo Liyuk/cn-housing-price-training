@@ -265,7 +265,7 @@ LPR 侧，5 年期以上 LPR（与房贷直接相关）从 2019-08 推出时的 
 
 [9] 中国房地产估价师与房地产经纪人学会（CIREA）. 70 城二手住宅价格指数（历史附件）. <https://www.cirea.org.cn/content/4773>
 
-[10] 中国房价行情（creprice.cn）. 北京房地产数据报告（月度）. <https://www.creprice.cn/report/bj/>
+[10] 中国房价行情（creprice.cn）. 北京房地产数据报告（月度）. <https://www.creprice.cn/report/bj.html>
 
 ## 作者与声明
 
