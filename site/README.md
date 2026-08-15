@@ -10,6 +10,21 @@
 - `data/*.json` — 由 `scripts/build_demo_data.py` 从 `data/processed/` 的 CSV 预生成的数据包
 - `.nojekyll` — 让 GitHub Pages 不经过 Jekyll 处理
 
+### 数据包（`data/`）
+
+| 文件 | 内容 |
+|---|---|
+| `meta.json` | 关键数字、权重、覆盖范围、CIREA 同源验证 |
+| `forecast_series.json` | 全国 / 北京五年情景区间（历史 + 预测） |
+| `components.json` | 三成分逐月分解 |
+| `cities_yoy.json` | 70 城二手同比矩阵（热力图 + 单城） |
+| `district_scenarios.json` | 北京 17 区 / 重庆 26 区 2030 情景 |
+| `district_listing.json` | 北京 10 核心区挂牌均价面板 |
+| `lpr.json` | LPR 历史 |
+| `macro.json` | 全国宏观面板（投资/开工/销售/待售同比） |
+| `market_compare.json` | 新房 vs 二手环比指数 |
+| `official.json` | 北京官方 2025-10 区级网签 |
+
 ## 本地预览
 
 ```bash
