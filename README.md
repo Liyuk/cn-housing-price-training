@@ -4,7 +4,9 @@
 
 **数据方法论文：** [可测量与不可测量：中国房价数据的一种来源—口径感知构建方法（以北京为区级案例）](docs/paper-china-housing-price-data-methods.md)（v0.4, preprint）
 
-**预测论文：** [未来五年中国二手住宅价格：一种可解释组合预测方法及其驻底分析（2026—2030）](docs/paper-five-year-housing-price-forecast.md)（v0.1, preprint）
+**预测论文：** [未来五年中国二手住宅价格：一种可解释组合预测方法及其驻底分析（2026—2030）](docs/paper-five-year-housing-price-forecast.md)（v0.2, preprint）
+
+**预测论文评审记录：** [评审记录：五年预测论文（v0.1→v0.2）](docs/review-five-year-housing-price-forecast.md)
 
 ## 数据口径
 
