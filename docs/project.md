@@ -48,6 +48,24 @@
 - **评审记录**：[`docs/review-five-year-housing-price-forecast.md`](review-five-year-housing-price-forecast.md)
 - **数据源清单**：[`docs/data_sources.md`](data_sources.md)
 
+### 发布约定（论文双份维护）
+
+本仓库的论文是**源文件**，个人站 liyuk.github.io 的 `research` 集合是**发布版**（全文拷贝）：
+
+| 位置 | 角色 |
+|---|---|
+| 本仓库 `docs/paper-*.md` | 论文**源**（正文 + 代码 + 数据） |
+| liyuk.github.io `src/content/research/2026/08/<slug>/zh.md` | 论文**发布版**（全文 + Astro frontmatter） |
+
+**修改论文时，两处必须同步更新。** 具体的发布侧差异（已存在，勿回退）：
+
+- liyuk 版开头多一段 Astro frontmatter（`title`/`description`/`createdAt`/`version`/`status`/`repositoryUrl`/`paperUrl`/`tags`）；
+- liyuk 版末尾有 `**作者：** Liyuk` 一行；
+- 引用自引时用 `（作者, 2026a）`（与文末参考文献 `[7]` 一致）；
+- 引号风格、图片路径等按各自仓库约定，正文内容必须一致。
+
+同步时可 `diff` 两个文件确认只差上述发布侧差异。
+
 ## 运行
 
 ```bash
