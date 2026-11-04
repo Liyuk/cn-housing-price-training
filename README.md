@@ -4,17 +4,43 @@
 
 ## 🖥️ 在线 Demo（GitHub Pages）
 
-**交互式预测看板：** <https://liyuk.github.io/cn-housing-price-training/>
+**趋势看板：** <https://liyuk.github.io/cn-housing-price-training/>
 
-可视化内容包括：五年情景区间（低/基准/高）、可解释三成分的权重与分解、70 城分化热力图、单城走势、北京 17 区挂牌价情景，以及 LPR 宏观背景。所有图表均由仓库中的处理数据预生成（`site/data/*.json`），全静态、无后端。
+站点是多页面的静态站（GitHub Pages，无后端），架构见 [`docs/site-architecture.md`](docs/site-architecture.md)：
 
-- 重新生成图表数据：`.venv/bin/python scripts/build_demo_data.py`
-- 本地预览：在 `site/` 目录下 `python3 -m http.server 8080`，访问 <http://localhost:8080>
-- 每次推送到 `main` 时，`deploy-demo.yml` 会自动重新构建并部署 `site/`（仅当 `site/**` 变化时触发）。
+| 页面 | 内容 |
+|---|---|
+| 总览 | 一句结论、全国走势大图（**折线 / K 线切换**）、4 个数字、各页入口 |
+| 城市榜 | 70 城榜单：寒/凉/平/温/热、趋势强度、同比环比、12 个月预测与概率 |
+| 城市页 | 单个城市的长期走势（折线/K 线，对照全国）、36 个月预测、**区县搜索**（价格/租金/租金收益率） |
+| 数据统计 | 全国与一/二/三线走势、上涨城市数、同比热力图、新房 vs 二手、宏观与 LPR、租金收益率、北京网签 |
+| 预测逻辑 | 模型与组合、实战回放、回测优势与区间覆盖率、各模型误差、预测账本 |
+| 数据与方法 | 覆盖与缺口、对账结果、每个数据块的时间范围、下载、更新记录 |
+| 论文 | 两篇论文、与网站数字的对应、待修订项 |
+
+时间标注全站一致：页面里不写死日期，起止/截至/期数/频率都来自 `site/data/manifest.json`；K 线由月度指数合成（无日内高低点），见页内"口径说明"。小区/楼盘级数据没有合规的批量来源，本站不提供。
+
+- 重新生成站点数据：`.venv/bin/python scripts/build_demo_data.py`；测试：`python -m unittest discover -s tests` 与 `node --test tests/js/*.test.mjs`
+- 本地预览：`python3 -m http.server 8080 --directory site`，访问 <http://localhost:8080>
+- 每次推送到 `main` 时，`deploy-demo.yml` 会自动重新部署 `site/`（仅当 `site/**` 变化时触发）。
+
+## 每月更新
+
+国家统计局每月 15–17 日发布 70 城指数。一条命令完成"抓新数据 → 预测 → 重生成看板数据 → 跑测试"：
+
+```bash
+bash scripts/monthly_update.sh        # 可选：TSFM_PY=/tmp/tsfm/bin/python 启用零样本基础模型 Chronos-2
+```
+
+- `src/update_data.py`：增量抓取 70 城指数、全国房地产宏观、LPR；官方页面的值优先于行业转载，被替换的单元逐格记录到 `reports/data_update_log.json`；原始 HTML 缓存在 `data/raw/nbs/`。首次回填 2011 年起的历史：`python -m src.update_data --base data/processed/housing_indices_clean_v3.csv --backfill-index <含官方 URL 的长表>`。
+- `src/probabilistic_forecast.py`：70 城 × 36 个月概率预测。基础模型（上月持续、12 月均值、AR(1)、阻尼趋势、跨城市 GBM、可选 Chronos-2）取历史误差最小的 2 个平均；区间宽度 = 月度波动×√期限 + 趋势不稳定度×期限，取近期加权的历史误差分位数；逐起点滚动回测的权重与区间只用当时已公布的数据。**+12 个月内比"价格不变"准 34%，80% 区间在 +24 个月内实际覆盖 78–82%；远期点预测只作情景，网站按回测计算的分区如实标注。**
+- `src/panel.py`：规范面板与校验（含“环比连乘 = 同比”恒等式守卫）；`python -m src.panel` 校验，`python scripts/acceptance.py` 做验收（数据、模型、站点、文档），`--full` 另查可复现。
+- `src/forecast_ledger.py`：每次更新把预测冻结到 `reports/forecast_ledger/<月份>.csv`（不覆盖），下期数据公布后自动评分——这是真正的事前检验。
+- 调研、实验与限制：[`docs/research-2026-11-upgrade.md`](docs/research-2026-11-upgrade.md)。
 
 **数据方法论文：** [可测量与不可测量：中国房价数据的一种来源—口径感知构建方法（以北京为区级案例）](docs/paper-china-housing-price-data-methods.md)（v0.4, preprint）
 
-**预测论文：** [未来五年中国二手住宅价格：一种可解释组合预测方法及其驻底分析（2026—2030）](docs/paper-five-year-housing-price-forecast.md)（v0.2, preprint）
+**预测论文：** [未来五年中国二手住宅价格：一种可解释组合预测方法及其驻底分析（2026—2030）](docs/paper-five-year-housing-price-forecast.md)（v0.2, preprint；其模型对 2026-07..09 的实战核对见调研文档 §4）
 
 **预测论文评审记录：** [评审记录：五年预测论文（v0.1→v0.2）](docs/review-five-year-housing-price-forecast.md)
 
