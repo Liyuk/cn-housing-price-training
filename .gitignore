@@ -9,3 +9,8 @@ models/
 reports/*.json
 reports/*.png
 !reports/district_forecast_model_selection.json
+data/processed/*.pkl
+data/processed/chronos2_paths.json
+!reports/probabilistic_forecast_backtest.json
+!reports/data_update_log.json
+.claude/

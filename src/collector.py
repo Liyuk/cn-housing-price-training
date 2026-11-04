@@ -66,14 +66,45 @@ class TableParser(HTMLParser):
 
 
 def normalize_city(value: str) -> str:
-    return re.sub(r"\s+", "", value).replace("\u3000", "")
+    # 2011-2013 pages footnote Beijing's new-home row as "北京*" / "北京＊"
+    return re.sub(r"[\s*＊※]+", "", value).replace("\u3000", "")
 
 
 def _number(value: str) -> float:
     return float(value.replace("—", "100").replace("-", "100"))
 
 
+def _table_head(table: List[List[str]]) -> str:
+    return re.sub(r"\s+", "", "".join("".join(row) for row in table[:3]))
+
+
+def _table_market(table: List[List[str]]) -> Optional[str]:
+    """Market named in a table's header, '' when unlabeled, None to skip.
+
+    Pre-2017 pages carry 新建住宅 (incl. affordable housing), 新建商品住宅 and
+    二手住宅 tables in that order, sometimes after a 15-city comparison table,
+    so table position alone is not reliable for those years.
+    """
+    head = _table_head(table)
+    if "分类" in head or "90m2" in head or "90平方米" in head or "15个" in head:
+        return None
+    if "二手住宅" in head:
+        return "secondhand"
+    if "新建商品住宅" in head:
+        return "new"
+    if "新建住宅" in head:
+        return None
+    return ""
+
+
+def _city_rows(table: List[List[str]]) -> int:
+    return sum(1 for row in table if len(row) >= 4 and re.search(r"[一-鿿]", row[0]) and re.search(r"\d", row[1]))
+
+
 def _rows_to_records(table: List[List[str]], month: str, market: str, source_url: str) -> Iterable[Dict[str, object]]:
+    # 2011-2016 tables carry a fixed-base index (2010=100 / 2015=100) where
+    # later tables carry the year-to-date average; it is not comparable.
+    fixed_base = "定基" in _table_head(table)
     for row in table[2:]:
         if len(row) < 6:
             continue
@@ -91,7 +122,7 @@ def _rows_to_records(table: List[List[str]], month: str, market: str, source_url
                     "market": market,
                     "month_on_month": _number(row[offset + 1]),
                     "yoy": _number(row[offset + 2]),
-                    "year_avg": _number(row[offset + 3]) if width == 4 else None,
+                    "year_avg": _number(row[offset + 3]) if width == 4 and not fixed_base else None,
                     "methodology": "current",
                     "source_url": source_url,
                 }
@@ -133,10 +164,31 @@ def parse_index_tables(html: str, month: str, source_url: str) -> List[Dict[str,
             records.extend(_legacy_rows_to_records(table, month, source_url))
         if len(records) >= 100:
             return records
-    if len(parser.tables) < 2:
+    # Candidate 70-city tables (≥30 city rows; the 15-city comparison and
+    # size-band tables are excluded).  A table labeled in its header keeps its
+    # label; unlabeled tables fill the missing markets in page order (new
+    # first), which is also the layout of current-era pages.
+    candidates = [
+        (market, table) for table in parser.tables
+        if (market := _table_market(table)) is not None and _city_rows(table) >= 30
+    ]
+    if not candidates:
+        # small fixtures and partial pages: fall back to any non-skipped tables
+        candidates = [(market, table) for table in parser.tables if (market := _table_market(table)) is not None]
+    labeled: Dict[str, List[List[str]]] = {}
+    for market, table in candidates:
+        if market and market not in labeled:
+            labeled[market] = table
+    for market, table in candidates:
+        if market == "":
+            missing = [m for m in ("new", "secondhand") if m not in labeled]
+            if not missing:
+                break
+            labeled[missing[0]] = table
+    if "new" not in labeled or "secondhand" not in labeled:
         raise ValueError("页面中未找到新房和二手房指数表")
-    records = list(_rows_to_records(parser.tables[0], month, "new", source_url))
-    records.extend(_rows_to_records(parser.tables[1], month, "secondhand", source_url))
+    records = list(_rows_to_records(labeled["new"], month, "new", source_url))
+    records.extend(_rows_to_records(labeled["secondhand"], month, "secondhand", source_url))
     return records
 
 

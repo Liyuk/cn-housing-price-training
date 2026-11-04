@@ -22,7 +22,7 @@ def clean_price_data(input_path: str, output_path: str) -> pd.DataFrame:
     if missing:
         raise ValueError(f"缺少字段: {sorted(missing)}")
     data["month"] = pd.to_datetime(data["month"], errors="coerce").dt.strftime("%Y-%m")
-    data["city"] = data["city"].astype(str).str.replace(r"\s+", "", regex=True).replace(CITY_ALIASES)
+    data["city"] = data["city"].astype(str).str.replace(r"[\s*＊※]+", "", regex=True).replace(CITY_ALIASES)
     data["market"] = data["market"].replace({"new_house": "new", "second_hand": "secondhand"})
     for column in NUMERIC_COLUMNS:
         data[column] = pd.to_numeric(data[column], errors="coerce")
