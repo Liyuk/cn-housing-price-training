@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>数据统计 · 趋势看板</title>
+  <meta name="description" content="价格走势、上涨城市数、同比热力图、新房与二手、宏观与 LPR、租金收益率。" />
+  <meta name="color-scheme" content="dark light" />
+  <script>try { document.documentElement.dataset.theme = localStorage.getItem("theme") || "dark"; } catch (e) {}</script>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div id="shell-header"></div>
+  <main class="wrap">
+    <section class="page-head">
+      <h1>数据统计：发生了什么</h1>
+      <p class="lead">只讲事实，不讲预测（预测见<a href="forecast.html">预测逻辑</a>）。每个模块都标明自己的数据范围，因为各来源的最新月份不同。</p>
+    </section>
+    <section class="block tight">
+      <div class="sec-head"><h2>价格走势：全国与三个层级</h2><p data-vintage="cum.json"></p></div>
+      <div class="panel hero"><div id="tier-view"></div><p class="foot" id="tier-foot"></p></div>
+    </section>
+    <section class="block">
+      <div class="sec-head"><h2>上涨城市数：止跌信号</h2>
+        <p>每月环比上涨的城市有多少座。它比全国平均更早反映拐点。<span data-vintage="breadth.json"></span></p></div>
+      <div class="panel card"><div id="chart-breadth" class="chart mid" role="img" aria-label="每月环比上涨的城市数"></div><p class="foot" id="breadth-foot"></p></div>
+    </section>
+    <section class="block">
+      <div class="sec-head"><h2>70 城同比热力图</h2><p>按最新同比从高到低排列。<span data-vintage="cities_yoy.json"></span></p></div>
+      <div class="panel card" id="heat-card">
+        <div id="chart-heat" class="chart huge" role="img" aria-label="70 城二手住宅同比指数热力图"></div>
+        <p class="foot">蓝色 = 低于上年同期，灰色 = 持平，橙红 = 高于上年同期；空白为当月无数据。</p>
+      </div>
+    </section>
+    <section class="block">
+      <div class="sec-head"><h2>新房 vs 二手</h2><p>70 城环比指数的均值。<span data-vintage="market_compare.json"></span></p></div>
+      <div class="panel card" id="compare-card"><div id="chart-compare" class="chart mid" role="img" aria-label="新房与二手住宅环比指数对比"></div>
+        <p class="foot">100 以下为环比下跌；新房有少数月份缺口，不显示。</p></div>
+    </section>
+    <section class="block">
+      <div class="sec-head"><h2>宏观与利率</h2><p id="macro-lead"></p></div>
+      <div id="macro-card">
+        <div class="panel card">
+          <div class="hero-head"><select class="search" id="macro-picker" aria-label="选择宏观指标"></select><span class="sub" data-vintage="macro.json"></span></div>
+          <div id="chart-macro" class="chart mid" role="img" aria-label="宏观指标同比"></div>
+          <p class="foot">累计口径同比（%）：每个点是“年初至当月”相对上年同期；虚线为零线。来源：国家统计局房地产数据月报。</p>
+        </div>
+        <div class="panel card mt">
+          <div class="hero-head"><h2>贷款利率（LPR）</h2><span class="sub" data-vintage="lpr.json"></span></div>
+          <div id="chart-lpr" class="chart short" role="img" aria-label="LPR 历史"></div>
+          <p class="foot" id="lpr-foot"></p>
+        </div>
+      </div>
+    </section>
+    <section class="block">
+      <div class="sec-head"><h2>租金收益率与北京网签</h2>
+        <p>租金收益率 = 月租金 × 12 ÷ 单价，取各城市榜内区的中位数。第三方月报，不是成交价。</p></div>
+      <div id="yield-card">
+        <div class="panel card">
+          <div class="hero-head"><h2>各城市租金收益率</h2><span class="sub" data-vintage="yield.json"></span></div>
+          <div id="chart-yield" class="chart tall" role="img" aria-label="各城市租金收益率"></div>
+          <p class="foot" id="yield-foot"></p>
+        </div>
+        <div class="panel card mt">
+          <div class="hero-head"><h2>北京官方区级网签</h2><span class="sub"><span id="official-month"></span> 单月 · 合计 <span id="official-total">—</span> 套</span></div>
+          <div id="chart-official" class="chart short" role="img" aria-label="北京官方区级网签套数"></div>
+          <p class="foot">来源：北京市住建委商品房交易公示平台，官方口径；只有这一个月的快照。</p>
+        </div>
+      </div>
+    </section>
+  </main>
+  <div id="shell-footer"></div>
+  <script type="module" src="assets/js/pages/stats.js"></script>
+</body>
+</html>

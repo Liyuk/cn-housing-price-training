@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>城市 · 趋势看板</title>
+  <meta name="description" content="单个城市的价格走势、折线与 K 线、36 个月概率预测、区县价格与租金。" />
+  <meta name="color-scheme" content="dark light" />
+  <script>try { document.documentElement.dataset.theme = localStorage.getItem("theme") || "dark"; } catch (e) {}</script>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div id="shell-header"></div>
+  <main class="wrap">
+    <section class="page-head" id="city-head"></section>
+    <div class="city-tools"><label for="city-picker" class="dim">切换城市</label> <select class="search" id="city-picker"></select> <a href="cities.html" class="dim">← 城市榜</a></div>
+    <section class="block tight city-only">
+      <div class="facts" id="city-facts"></div>
+      <div class="panel hero">
+        <div class="hero-head"><h2>价格走势与预测</h2><span class="sub" data-vintage="cum.json"></span></div>
+        <div id="city-view"></div>
+        <p class="foot" id="city-view-foot"></p>
+      </div>
+    </section>
+    <section class="block city-only">
+      <div class="sec-head"><h2>未来 36 个月</h2><p id="city-fan-note"></p></div>
+      <div class="panel card" id="city-fan"></div>
+    </section>
+    <section class="block city-only">
+      <div class="sec-head"><h2>区县：价格、租金与租金收益率</h2>
+        <p>搜索区县，查看单价、月租金与租金收益率（月租金 × 12 ÷ 单价）的逐月走势。第三方月报，<b>不是成交价</b>。</p></div>
+      <div class="panel card" id="district-box"></div>
+    </section>
+    <section class="block city-only">
+      <div class="sec-head"><h2>小区与楼盘</h2></div>
+      <div class="panel card"><p class="callout" style="margin:0">本站不提供小区、楼盘级价格与成交。公开渠道里没有合规的批量来源：挂牌平台的小区数据需要授权，爬取有条款风险；官方网签只到区一级，且只有部分城市公布。与其放一个空壳搜索框，不如明确说明——数据边界见<a href="data.html">数据与方法</a>。</p></div>
+    </section>
+  </main>
+  <div id="shell-footer"></div>
+  <script type="module" src="assets/js/pages/city.js"></script>
+</body>
+</html>

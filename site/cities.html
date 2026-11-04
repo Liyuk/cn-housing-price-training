@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>城市榜 · 趋势看板</title>
+  <meta name="description" content="70 城二手住宅价格榜单：温度、趋势强度、同比环比、12 个月预测与概率。" />
+  <meta name="color-scheme" content="dark light" />
+  <script>try { document.documentElement.dataset.theme = localStorage.getItem("theme") || "dark"; } catch (e) {}</script>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div id="shell-header"></div>
+  <main class="wrap">
+    <section class="page-head">
+      <h1>城市榜：谁在回暖，谁还在降温</h1>
+      <p class="lead">
+        <b>温度</b>看最近 6 个月的平均环比涨跌，<b>趋势强度</b>看最近 3 个月在 70 城里的相对位置（100 = 最强）。
+        点任意城市进入它的页面：长期走势、折线或 K 线、36 个月预测，以及区县价格与租金。
+        数据截至 <span data-fill="dataThrough"></span>（<span data-vintage="board.json"></span>）。
+      </p>
+    </section>
+    <section class="block tight">
+      <div id="board"></div>
+      <p class="legend-note" id="board-note"></p>
+    </section>
+  </main>
+  <div id="shell-footer"></div>
+  <script type="module" src="assets/js/pages/cities.js"></script>
+</body>
+</html>

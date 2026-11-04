@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>预测逻辑 · 趋势看板</title>
+  <meta name="description" content="预测怎么做、靠不靠谱：模型与组合、区间、实战回放、回测与预测账本。" />
+  <meta name="color-scheme" content="dark light" />
+  <script>try { document.documentElement.dataset.theme = localStorage.getItem("theme") || "dark"; } catch (e) {}</script>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div id="shell-header"></div>
+  <main class="wrap">
+    <section class="page-head">
+      <h1>预测逻辑：怎么预测，靠不靠谱</h1>
+      <p class="lead">
+        预测起点 <b id="fc-origin"></b>，到 <b id="fc-end"></b>。我们不只给出预测，也给出它过去的成绩。
+        <b>近期可用、远期只是情景。</b>下面每一项都来自“只看当时已公布的数据”的滚动回测。
+      </p>
+    </section>
+    <section class="block tight">
+      <div class="sec-head"><h2>预测是怎么做的</h2></div>
+      <div class="panel card">
+        <ul class="src-list">
+          <li><b>目标</b>：每座城市二手住宅指数未来 1–36 个月的累计变化；全国由 70 城自下而上汇总。</li>
+          <li><b>基础模型</b>：上月持续、12 月均值、AR(1) 回归、阻尼趋势、跨城市 GBM，以及零样本基础模型 Chronos-2。</li>
+          <li><b>组合</b>：+12 个月内取历史误差最小的 2 个模型平均（只用当时已公布的数据）；之后固定用阻尼趋势。</li>
+          <li><b>区间</b>：宽度 = 月度波动 × √期限 + 趋势不稳定度 × 期限；取历史误差的经验分位数，近期的起点权重更大（半衰期约 12 个月）。</li>
+          <li><b>数据范围</b>：只用现行口径的月份（口径断点之后至 <span data-fill="dataThrough"></span>），旧口径不进模型。</li>
+          <li><b>不含</b>：政策、利率、人口等外生变量；预测的是价格指数，不是每平方米成交价。</li>
+        </ul>
+        <div class="zones">
+          <div class="zone"><span class="tagz up" id="zone-reliable"></span><h4>可作预测</h4>用回测学到的权重组合；到 +<span id="rel-h"></span> 个月，80% 区间实际覆盖 <span id="rel-cov"></span>%，比“不变”准 <span id="rel-skill"></span>%，方向命中率约 <span id="rel-dir"></span>%。</div>
+          <div class="zone"><span class="tagz flatc" id="zone-caution"></span><h4>谨慎参考</h4>固定用阻尼趋势外推，这条规则是看到结果后定的，成绩偏乐观；到 +<span id="cau-h"></span> 个月，覆盖 <span id="cau-cov"></span>%，比“不变”准 <span id="cau-skill"></span>%。</div>
+          <div class="zone"><span class="tagz down" id="zone-scenario"></span><h4>只是情景</h4>到 +<span id="sce-h"></span> 个月，比“不变”只准 <span id="sce-skill"></span>%，80% 区间覆盖 <span id="sce-cov"></span>%：当作情景，不当作预测。</div>
+        </div>
+      </div>
+    </section>
+    <section class="block">
+      <div class="sec-head"><h2>实战回放</h2></div>
+      <div class="panel card">
+        <div class="hero-head"><h2 id="hindcast-title"></h2></div>
+        <div id="hindcast-table"></div>
+        <p class="callout" id="hindcast-callout"></p>
+      </div>
+    </section>
+    <section class="block">
+      <div class="sec-head"><h2>预测账本：真正的事前检验</h2><p>每次更新冻结当期全部预测，下期数据公布后自动打分。<span data-vintage="scorecard.json"></span></p></div>
+      <div class="panel card" id="ledger"></div>
+    </section>
+    <section class="block">
+      <div class="sec-head"><h2>回测成绩</h2><p>每个回测起点只用当时已公布的数据学习权重与区间。</p></div>
+      <div class="grid2">
+        <div class="panel card">
+          <div class="hero-head"><h2>比“不变”好多少</h2><span class="sub">平均误差降低的比例</span></div>
+          <div id="chart-skill" class="chart short" role="img" aria-label="各预测期限相对于价格不变的误差降低比例"></div>
+          <p class="foot">0 以上表示比“价格不变”更准。越往远优势越小。</p>
+        </div>
+        <div class="panel card">
+          <div class="hero-head"><h2>区间可信吗</h2><span class="sub">80% 区间的实际覆盖率</span></div>
+          <div id="chart-cover" class="chart short" role="img" aria-label="80% 预测区间的实际覆盖率"></div>
+          <p class="foot">理想是 80%。每个点是回测中该期限实际落入区间的比例；区间宽度按当时的趋势不稳定程度和近期误差调整，所以不随期限单调变窄。</p>
+        </div>
+      </div>
+      <div class="panel card mt">
+        <div class="hero-head"><h2>每个模型的平均误差</h2><span class="sub">单位：百分点，70 城 × <span id="n-origins"></span> 个回测起点</span></div>
+        <div id="model-table"></div>
+        <p class="foot" id="model-foot"></p>
+      </div>
+    </section>
+    <section class="block">
+      <div class="sec-head"><h2>区县情景（论文 v0.2）</h2>
+        <p>把城市级官方指数路径投影到区级挂牌均价上。<b>区级价格是第三方挂牌均价或代理基准，不是成交价。</b>灰线为 2026 基准，蓝点为 2030 基准，金色条为 2030 低–高区间。这部分沿用 v0.2 五年情景（<span data-vintage="district_scenarios.json"></span>）。</p></div>
+      <div class="panel card" id="scen-card">
+        <div class="hero-head">
+          <div class="seg" id="district-seg" role="group" aria-label="选择城市">
+            <button type="button" data-v="北京" aria-pressed="true">北京 17 区</button><button type="button" data-v="重庆" aria-pressed="false">重庆 26 区</button>
+          </div>
+        </div>
+        <div id="chart-district" class="chart tall" role="img" aria-label="区县挂牌价情景"></div>
+      </div>
+    </section>
+  </main>
+  <div id="shell-footer"></div>
+  <script type="module" src="assets/js/pages/forecast.js"></script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>论文 · 趋势看板</title>
+  <meta name="description" content="项目的两篇论文、版本与待修订项。" />
+  <meta name="color-scheme" content="dark light" />
+  <script>try { document.documentElement.dataset.theme = localStorage.getItem("theme") || "dark"; } catch (e) {}</script>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div id="shell-header"></div>
+  <main class="wrap">
+    <section class="page-head">
+      <h1>论文</h1>
+      <p class="lead">网站是论文方法的持续运行版本。论文是某一时点的快照，数字不随数据更新；下面说明二者的对应关系和已知的待修订项。</p>
+    </section>
+    <section class="block tight">
+      <div class="grid2">
+        <article class="panel card">
+          <h3 class="paper-t">可测量与不可测量：中国房价数据的一种来源—口径感知构建方法（以北京为区级案例）</h3>
+          <p class="dim">v0.4 · preprint · 2026-08-15</p>
+          <p>提出“来源—口径感知”的数据构建方法：来源分级标签、口径切换标记、时间与空间泄漏控制、数据交叉验证，把“数字能告诉我们什么 / 不能告诉我们什么”编码进数据本身。</p>
+          <div class="links"><a href="https://github.com/Liyuk/cn-housing-price-training/blob/main/docs/paper-china-housing-price-data-methods.md" target="_blank" rel="noopener">全文（GitHub）</a></div>
+        </article>
+        <article class="panel card">
+          <h3 class="paper-t">未来五年中国二手住宅价格：一种可解释组合预测方法及其驻底分析（2026—2030）</h3>
+          <p class="dim">v0.2 · preprint · 2026-08-15</p>
+          <p>可解释三成分组合（趋势延续 / 均值回归 / 季节性），权重由滚动样本外验证选择；给出全国与北京的情景区间与驻底分析。区间不是概率分布。</p>
+          <div class="links"><a href="https://github.com/Liyuk/cn-housing-price-training/blob/main/docs/paper-five-year-housing-price-forecast.md" target="_blank" rel="noopener">全文（GitHub）</a>
+            <a href="https://github.com/Liyuk/cn-housing-price-training/blob/main/docs/review-five-year-housing-price-forecast.md" target="_blank" rel="noopener">评审记录</a></div>
+        </article>
+      </div>
+    </section>
+    <section class="block">
+      <div class="sec-head"><h2>论文与网站的对应</h2></div>
+      <div class="panel card"><div style="overflow-x:auto"><table class="plain">
+        <thead><tr><th>方面</th><th>论文（快照）</th><th>网站（持续更新）</th></tr></thead>
+        <tbody>
+          <tr><td>70 城二手指数范围</td><td>2019-01 至 2026-06，90 个月</td><td><span data-vintage="cum.json"></span></td></tr>
+          <tr><td>预测方法</td><td>三成分组合，仅全国与北京（v0.2）</td><td>70 城 × 36 个月概率预测，含零样本基础模型（见<a href="forecast.html">预测逻辑</a>）</td></tr>
+          <tr><td>区间</td><td>按历史 5 年波动锚定的情景区间，不是概率分布</td><td>按历史误差经验分位数，并公布回测覆盖率</td></tr>
+          <tr><td>检验</td><td>权重选择的滚动样本外验证</td><td>逐起点滚动回测 + 实战回放 + 预测账本</td></tr>
+          <tr><td>区县</td><td>北京/重庆区县挂牌价情景（v0.2）</td><td>多城市区县价格、租金与租金收益率（城市页）</td></tr>
+        </tbody></table></div></div>
+    </section>
+    <section class="block">
+      <div class="sec-head"><h2>待修订项</h2></div>
+      <div class="panel card">
+        <ul class="src-list" style="columns:1">
+          <li><b>CIREA 对账（数据方法论文 §3.5）</b>：原文称“3,990 个重叠单元上差值全部为 0、r = 1.0000”。该检验把标记为 CIREA 来源的单元与 CIREA 文件本身比较，等于自我比对。改用直接抓取的官方页面后：可核对 2,520 格，4 格不一致（2021-01 两对城市的数据行互换，最大偏差 4.1 点），r = 0.9995；其余 1,470 格无官方页面，对照第三方镜像：1,434 个一致，36 个不同且全部是镜像自身的互换。定性结论（CIREA 是官方转载）成立，但“逐格完全一致”不成立。详见<a href="data.html">数据与方法</a>。</li>
+          <li><b>数据范围</b>：论文使用的 2019 年起 90 个月面板已被更长的面板取代（二手住宅 2006-01 起 249 个月无缺口；站内使用通过自洽检验的 2008-01 起），缺口也已补齐。</li>
+          <li><b>五年预测（v0.2）</b>：对 2026-07 至 2026-09 的实战核对显示，北京连续高于其区间上沿，全国贴近上沿；趋势成分滞后于拐点，区间偏窄（见<a href="forecast.html">预测逻辑</a>）。</li>
+        </ul>
+        <p class="foot">论文双份维护（本仓库 <code>docs/</code> 与个人站 liyuk.github.io 发布版），修订须两处同步。本页只记录待修订项，不改论文正文。</p>
+      </div>
+    </section>
+  </main>
+  <div id="shell-footer"></div>
+  <script type="module" src="assets/js/pages/papers.js"></script>
+</body>
+</html>
