@@ -1,0 +1,136 @@
+[
+  {
+    "run": "2026-11-04T02:09:12",
+    "note": "backfill run: official pages (URL index from a third-party mirror, values re-fetched from stats.gov.cn) vs the old v3 panel",
+    "city_months_fetched": 161,
+    "overlap_cells_compared": 7980,
+    "replaced_cells_with_different_values": [
+      {
+        "month": "2021-01",
+        "city": "徐州",
+        "market": "secondhand",
+        "month_on_month_old": 100.5,
+        "month_on_month_new": 101.0,
+        "yoy_old": 105.0,
+        "yoy_new": 109.1,
+        "methodology_old": "current_cirea_legacy_doc"
+      },
+      {
+        "month": "2021-01",
+        "city": "惠州",
+        "market": "secondhand",
+        "month_on_month_old": 100.3,
+        "month_on_month_new": 100.7,
+        "yoy_old": 99.8,
+        "yoy_new": 103.9,
+        "methodology_old": "current_cirea_legacy_doc"
+      },
+      {
+        "month": "2021-01",
+        "city": "扬州",
+        "market": "secondhand",
+        "month_on_month_old": 101.0,
+        "month_on_month_new": 100.5,
+        "yoy_old": 109.1,
+        "yoy_new": 105.0,
+        "methodology_old": "current_cirea_legacy_doc"
+      },
+      {
+        "month": "2021-01",
+        "city": "韶关",
+        "market": "secondhand",
+        "month_on_month_old": 100.7,
+        "month_on_month_new": 100.3,
+        "yoy_old": 103.9,
+        "yoy_new": 99.8,
+        "methodology_old": "current_cirea_legacy_doc"
+      }
+    ]
+  },
+  {
+    "run": "2026-11-04T02:48:59",
+    "lpr_months_added": [
+      "2026-08",
+      "2026-09",
+      "2026-10"
+    ],
+    "macro_months_added": [
+      "2026-07",
+      "2026-08",
+      "2026-09"
+    ]
+  },
+  {
+    "run": "2026-11-04T03:46:33",
+    "lpr_months_added": [],
+    "macro_months_added": []
+  },
+  {
+    "run": "2026-11-04T03:58:49",
+    "legacy_mirror": {
+      "source": "https://github.com/wofeiwo/70city-price-skill (data/70cityprice.csv; derived from the NBS database)",
+      "compared_cells": 13580,
+      "identical_cells": 13580,
+      "months": [
+        "2011-02",
+        "2020-10"
+      ],
+      "months_added": 61,
+      "panel_range": [
+        "2006-01",
+        "2026-09"
+      ]
+    }
+  },
+  {
+    "run": "2026-11-04T03:59:37",
+    "mirror_filled_gaps": [
+      "new:2012-01",
+      "new:2012-02",
+      "new:2012-03",
+      "new:2012-05",
+      "new:2012-06",
+      "new:2012-07",
+      "new:2012-08",
+      "new:2016-09",
+      "new:2016-10",
+      "new:2016-11",
+      "new:2019-07",
+      "new:2019-08",
+      "new:2019-11",
+      "new:2019-12",
+      "new:2020-03",
+      "new:2020-04",
+      "new:2020-06",
+      "new:2020-07",
+      "new:2020-08",
+      "new:2020-09",
+      "new:2020-11",
+      "new:2020-12",
+      "secondhand:2012-01",
+      "secondhand:2012-02",
+      "secondhand:2012-03",
+      "secondhand:2012-05",
+      "secondhand:2012-06",
+      "secondhand:2012-07",
+      "secondhand:2012-08",
+      "secondhand:2016-09",
+      "secondhand:2016-10",
+      "secondhand:2016-11"
+    ],
+    "legacy_mirror": {
+      "source": "https://github.com/wofeiwo/70city-price-skill (data/70cityprice.csv; derived from the NBS database)",
+      "compared_cells": 13580,
+      "identical_cells": 13580,
+      "months": [
+        "2011-02",
+        "2020-10"
+      ],
+      "months_added": 22,
+      "panel_range": [
+        "2006-01",
+        "2026-09"
+      ]
+    }
+  }
+]
