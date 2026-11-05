@@ -37,4 +37,6 @@ export async function boot(pageId, names, run, { echarts = true } = {}) {
     showError("页面渲染失败：" + (e.message || e));
   }
   ctx.vintage.bind(document); // labels added by run()
+  // jump to an in-page anchor only now: sections above it have finished rendering and no longer shift the layout
+  if (location.hash.length > 1) requestAnimationFrame(() => { try { document.querySelector(decodeURIComponent(location.hash))?.scrollIntoView(); } catch (e) { /* not a selector */ } });
 }

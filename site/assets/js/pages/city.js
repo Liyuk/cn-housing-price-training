@@ -4,6 +4,7 @@ import { createTrendView } from "../domain/trend-view.js";
 import { fanTable } from "../domain/trend-chart.js";
 import { mountDistrictExplorer } from "../domain/district-charts.js";
 import { tChip } from "../domain/board.js";
+import { icon } from "../core/icons.js";
 import { pct, cls, probText, esc, addMonths, range } from "../core/format.js";
 
 boot("cities", ["board", "cum", "fan"], async ({ data, vintage }) => {
@@ -11,6 +12,7 @@ boot("cities", ["board", "cum", "fan"], async ({ data, vintage }) => {
   const city = new URLSearchParams(location.search).get("c");
   const row = board.rows.find((r) => r.city === city);
   const head = document.querySelector("#city-head");
+  document.querySelector("#back-link").innerHTML = icon("arrow-left", 14) + "城市榜";
 
   const picker = document.querySelector("#city-picker");
   picker.innerHTML = board.rows.slice().sort((a, b) => a.city.localeCompare(b.city, "zh")).map((r) => `<option value="${esc(r.city)}"${r.city === city ? " selected" : ""}>${esc(r.city)}</option>`).join("");

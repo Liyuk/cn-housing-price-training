@@ -1,13 +1,14 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>论文 · 趋势看板</title>
   <meta name="description" content="项目的两篇论文、版本与待修订项。" />
   <meta name="color-scheme" content="dark light" />
-  <script>try { document.documentElement.dataset.theme = localStorage.getItem("theme") || "dark"; } catch (e) {}</script>
+  <script>try { var t = localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); document.documentElement.dataset.theme = t; } catch (e) {}</script>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="preload" href="assets/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="assets/styles.css" />
 </head>
 <body>
@@ -40,7 +41,7 @@
         <thead><tr><th>方面</th><th>论文（快照）</th><th>网站（持续更新）</th></tr></thead>
         <tbody>
           <tr><td>70 城二手指数范围</td><td>2019-01 至 2026-06，90 个月</td><td><span data-vintage="cum.json"></span></td></tr>
-          <tr><td>预测方法</td><td>三成分组合，仅全国与北京（v0.2）</td><td>70 城 × 36 个月概率预测，含零样本基础模型（见<a href="forecast.html">预测逻辑</a>）</td></tr>
+          <tr><td>预测方法</td><td>三成分组合，仅全国与北京（v0.2）</td><td>70 城 × 5 年概率预测（+12 个月内可作预测，之后仅作情景），含零样本基础模型（见<a href="forecast.html">预测逻辑</a>）</td></tr>
           <tr><td>区间</td><td>按历史 5 年波动锚定的情景区间，不是概率分布</td><td>按历史误差经验分位数，并公布回测覆盖率</td></tr>
           <tr><td>检验</td><td>权重选择的滚动样本外验证</td><td>逐起点滚动回测 + 实战回放 + 预测账本</td></tr>
           <tr><td>区县</td><td>北京/重庆区县挂牌价情景（v0.2）</td><td>多城市区县价格、租金与租金收益率（城市页）</td></tr>
@@ -52,7 +53,12 @@
         <ul class="src-list" style="columns:1">
           <li><b>CIREA 对账（数据方法论文 §3.5）</b>：原文称“3,990 个重叠单元上差值全部为 0、r = 1.0000”。该检验把标记为 CIREA 来源的单元与 CIREA 文件本身比较，等于自我比对。改用直接抓取的官方页面后：可核对 2,520 格，4 格不一致（2021-01 两对城市的数据行互换，最大偏差 4.1 点），r = 0.9995；其余 1,470 格无官方页面，对照第三方镜像：1,434 个一致，36 个不同且全部是镜像自身的互换。定性结论（CIREA 是官方转载）成立，但“逐格完全一致”不成立。详见<a href="data.html">数据与方法</a>。</li>
           <li><b>数据范围</b>：论文使用的 2019 年起 90 个月面板已被更长的面板取代（二手住宅 2006-01 起 249 个月无缺口；站内使用通过自洽检验的 2008-01 起），缺口也已补齐。</li>
-          <li><b>五年预测（v0.2）</b>：对 2026-07 至 2026-09 的实战核对显示，北京连续高于其区间上沿，全国贴近上沿；趋势成分滞后于拐点，区间偏窄（见<a href="forecast.html">预测逻辑</a>）。</li>
+          <li><b>五年预测（v0.2）的算法审查</b>（<code>docs/review-forecast-paper-algorithm-2026-11.md</code>，数字全部可复现）：
+            ① 均值回归的衰减因子用反了（<code>five_year_forecast.py:74</code> 用 1−ρ 当保留系数），修正后北京权重 0.25/0.50/0.25 变为 0/0.75/0.25，五年基准由 −4.6% 变为 −7.0%，论文报告的半衰期不是模型在用的；全国不变。
+            ② 权重只在 7 个重叠窗口（约 2.5 个独立年份、同一轮下行）里选出，北京第一名只比第二名好 0.1%；仅切点一个超参数就让北京头条在 −0.6% 到 −9.6% 之间摆动。
+            ③ 在 2016–2021 年的起点上滚动检验：全国 +12/+24 个月比“价格不变”好 30%/16%，+36/+60 个月差 7%/36%；北京所有期限都不如“不变”；低/高带的实际覆盖率只有 14%–50%。
+            ④ 引用：Piazzesi–Schneider 原文是“一小群”家庭，论文写“大量”；Glaeser–Nathanson 的结论是一年动量、<b>五年均值回归</b>，与论文对五年期的做法相反；Case–Shiller 说季节性证据弱，论文给了季节性 25% 权重。
+            另：2026-07 至 09 的实战核对显示北京连续高于其区间上沿，全国贴近上沿（见<a href="forecast.html">预测逻辑</a>）。</li>
         </ul>
         <p class="foot">论文双份维护（本仓库 <code>docs/</code> 与个人站 liyuk.github.io 发布版），修订须两处同步。本页只记录待修订项，不改论文正文。</p>
       </div>

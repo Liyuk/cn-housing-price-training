@@ -58,11 +58,20 @@ def estimate_reversion(series: pd.Series) -> dict[str, float]:
     return {"rho": round(rho, 4), "half_life_months": round(half_life, 1)}
 
 
-def _component_forecasts(hist: pd.Series, horizon: int, rho: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Return (trend, mean-reversion, seasonality) forecasts of length horizon."""
+def _component_forecasts(hist: pd.Series, horizon: int, rho: float,
+                         ar1_fix: bool = False) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return (trend, mean-reversion, seasonality) forecasts of length horizon.
+
+    ``ar1_fix=False`` reproduces the v0.2 paper.  There the reversion step keeps
+    ``1 - rho`` of the gap to the long-run mean each month, i.e. it *closes* ``rho``
+    of the gap in the first step (96% nationally, 69% for Beijing), so the component
+    is effectively "jump to the sample mean" and the half-lives the paper reports
+    (16.1 and 1.9 months) are not what it uses.  ``ar1_fix=True`` keeps ``rho``,
+    which is what an AR(1) means; see scripts/paper_algorithm_audit.py.
+    """
     vals = hist.to_numpy(float)
     trend = np.full(horizon, float(np.mean(vals[-12:])))
-    speed = 1.0 - rho
+    speed = rho if ar1_fix else 1.0 - rho
     long_mean = float(np.mean(vals))
     anchor = float(np.mean(vals[-12:]))
     reversion = []
@@ -78,6 +87,7 @@ def _grid_search_weights(
     series: pd.Series,
     horizon: int,
     rho: float,
+    ar1_fix: bool = False,
 ) -> tuple[np.ndarray, float]:
     """Choose component weights by rolling out-of-sample MAE on the history.
 
@@ -98,7 +108,7 @@ def _grid_search_weights(
             for cutoff in range(36, train_end - horizon + 1, 3):
                 hist = pd.Series(vals[:cutoff], index=idx[:cutoff])
                 actual = vals[cutoff:cutoff + horizon]
-                t, r, s = _component_forecasts(hist, horizon, rho)
+                t, r, s = _component_forecasts(hist, horizon, rho, ar1_fix)
                 pred = w1 * t + w2 * r + w3 * s
                 errs.extend(np.abs(pred - actual).tolist())
             if not errs:
@@ -115,10 +125,11 @@ def forecast_explainable(
     series: pd.Series,
     horizon: int = 60,
     anchor_window: int = 12,
+    ar1_fix: bool = False,
 ) -> tuple[pd.DataFrame, dict[str, object]]:
     """Forecast with data-selected weights and a decomposition of each step."""
     rho = estimate_reversion(series)["rho"]
-    weights, train_mae = _grid_search_weights(series, 12, rho)
+    weights, train_mae = _grid_search_weights(series, 12, rho, ar1_fix)
     hist = series.copy()
     months = pd.date_range(series.index[-1] + pd.offsets.MonthBegin(1), periods=horizon, freq="MS")
     base = np.empty(horizon)
@@ -126,7 +137,7 @@ def forecast_explainable(
     reversion_c = np.empty(horizon)
     season_c = np.empty(horizon)
     for i in range(horizon):
-        t, r, s = _component_forecasts(hist, 1, rho)
+        t, r, s = _component_forecasts(hist, 1, rho, ar1_fix)
         trend_c[i], reversion_c[i], season_c[i] = t[0], r[0], s[0]
         base[i] = weights[0] * t[0] + weights[1] * r[0] + weights[2] * s[0]
         # advance history for seasonality reference

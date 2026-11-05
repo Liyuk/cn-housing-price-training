@@ -74,7 +74,7 @@ export function createBoard(root, board, { cityHref = (c) => `city.html?c=${enco
       const sort = state.key === c.k ? (state.dir < 0 ? "descending" : "ascending") : "none";
       return `<th class="${c.cls || ""}" ${c.sortable ? `aria-sort="${sort}"` : ""}>${c.sortable ? `<button type="button" data-sort="${c.k}">${c.label}</button>` : c.label}</th>`;
     }).join("") + "</tr>";
-    tbody.innerHTML = rows.map((r, i) => `
+    tbody.innerHTML = !rows.length ? `<tr class="empty"><td colspan="${COLS.length}">没有符合条件的城市。<br/><button type="button" class="btn sm outline" data-reset>清除筛选</button></td></tr>` : rows.map((r, i) => `
       <tr>
         <td class="rank">${i + 1}</td>
         <td class="l">${tChip(r.temp)}</td>
@@ -92,6 +92,12 @@ export function createBoard(root, board, { cityHref = (c) => `city.html?c=${enco
   }
 
   root.addEventListener("click", (e) => {
+    if (e.target.closest("[data-reset]")) {
+      Object.assign(state, { temps: new Set(), tier: 0, q: "", turning: false });
+      root.querySelectorAll("[data-temp]").forEach((b) => b.setAttribute("aria-pressed", "false"));
+      root.querySelector('[data-f="tier"]').value = "0"; root.querySelector('[data-f="q"]').value = ""; root.querySelector('[data-f="turning"]').checked = false;
+      return render();
+    }
     const chip = e.target.closest("[data-temp]");
     if (chip) {
       const t = chip.dataset.temp, on = !state.temps.has(t);

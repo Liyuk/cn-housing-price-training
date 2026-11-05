@@ -1,13 +1,14 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>数据与方法 · 趋势看板</title>
   <meta name="description" content="数据来源、口径、覆盖与缺口、对账结果、更新流程与下载。" />
   <meta name="color-scheme" content="dark light" />
-  <script>try { document.documentElement.dataset.theme = localStorage.getItem("theme") || "dark"; } catch (e) {}</script>
+  <script>try { var t = localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); document.documentElement.dataset.theme = t; } catch (e) {}</script>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="preload" href="assets/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="assets/styles.css" />
 </head>
 <body>
@@ -27,15 +28,13 @@
       <div class="sec-head"><h2>行业转载指数与官方页面：逐格对账</h2></div>
       <div class="panel card"><div class="cirea" id="cirea"></div><p class="callout" id="cirea-callout"></p></div>
     </section>
-    <section class="block">
-      <div class="sec-head"><h2>口径要点</h2></div>
-      <div class="panel card">
+    <section class="block" id="definitions">
+      <div class="sec-head"><h2>口径说明</h2><p>每个数字的含义、不能拿它做什么，以及各数据块之间不能直接比较的地方。</p></div>
+      <div class="panel card" id="defs-body"></div>
+      <div class="panel card mt">
         <ul class="src-list">
-          <li><b>指数 ≠ 房价</b>：环比 = 上月 100，同比 = 上年同月 100，不是每平方米成交价。</li>
           <li><b>来源分级</b>：官方 / 行业转载 / 第三方 / 模型 / 派生。每个单元格带 <code>methodology</code> 标记，不同来源不混用。</li>
-          <li><b>口径断点</b>：旧口径与现行口径在断点（见页首“口径说明”）两侧不可直接比较，模型只用断点之后的数据。</li>
           <li><b>累计口径</b>：宏观面板是“年初至当月”的累计同比，不能与单月同比比较。</li>
-          <li><b>区县</b>：第三方月报，每页仅前 10 名区，非成交价；官方区级只有北京网签。</li>
           <li><b>不提供</b>：城市级月度销量（国家统计局没有）、小区/楼盘级数据（没有合规的批量来源）。</li>
         </ul>
       </div>

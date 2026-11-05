@@ -22,7 +22,7 @@ Outputs (all written to site/data/):
     official.json                 Beijing official 2025-10 district signings
     board.json                    70-city trend board (temperature, strength, 12m forecast)
     cum.json                      chained second-hand index since 2011 per city + phases
-    fan.json                      probabilistic 36-month fans per city and national
+    fan.json                      probabilistic multi-year fans per city and national
     breadth.json                  number of cities with rising prices, per month
     scorecard.json                v0.2 vs actual, hindcast, walk-forward and model comparison
 
@@ -412,16 +412,14 @@ def build_board() -> dict:
             "from_peak_pct": ph["from_peak_pct"],
             "peak_m": ph["peak"]["m"],
             "back_to": ph["back_to"],
-            "f3": round(float(100 * (np.exp(np.log((s["chg12"] + 100) / 100) * 0) - 0)), 2) if False else None,
             "f12": float(s["chg12"]),
             "lo12": float(s["lo12"]),
             "hi12": float(s["hi12"]),
             "p_up12": None if pd.isna(s["p_up12"]) else float(s["p_up12"]),
             "chg36": float(s["chg36"]),
+            **{k: (None if pd.isna(s.get(k)) else float(s[k])) for k in ("chg60", "lo60", "hi60", "p_up60") if k in s.index},
             "next_mom": float(s["next_mom"]),
         })
-    for row in rows:
-        row.pop("f3")
     rows.sort(key=lambda x: -x["strength"])
     temps = [x["temp"] for x in rows]
     nat = summary.loc["全国"]

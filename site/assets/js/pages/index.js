@@ -1,6 +1,7 @@
 import { boot } from "../core/boot.js";
 import { createTrendView } from "../domain/trend-view.js";
-import { pct, cls, range, addMonths } from "../core/format.js";
+import { pct, cls, addMonths } from "../core/format.js";
+import { icon } from "../core/icons.js";
 
 boot("home", ["board", "cum", "fan", "breadth", "scorecard"], ({ data, vintage }) => {
   const { board, cum, fan, breadth: br, scorecard } = data;
@@ -31,20 +32,20 @@ boot("home", ["board", "cum", "fan", "breadth", "scorecard"], ({ data, vintage }
   let peakI = last;
   br.up_mom.forEach((v, i) => { if (br.months[i] >= recent[0] && v > br.up_mom[peakI]) peakI = i; });
   const hc = scorecard.hindcast, m3 = hc.city_mae_pct_points["3"], f3 = hc.flat_mae_pct_points["3"];
-  const kpi = (k, v, dd) => `<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${dd}</div></div>`;
+  const row = (k, v, note) => `<tr><th scope="row">${k}</th><td><b>${v}</b><span class="note">${note}</span></td></tr>`;
   document.querySelector("#kpis").innerHTML = [
-    kpi(`+12 个月（${h12}）`, `<span class="${cls(nat.chg12)}">${pct(nat.chg12)}</span>`, `80% 区间 ${pct(nat.lo12)} ~ ${pct(nat.hi12)}<br/>高于现价的概率 ≈ ${Math.round(nat.p_up12 * 100)}%`),
-    kpi(`${br.months[last]} 环比上涨的城市`, `${br.up_mom[last]}<small>/ ${br.n[last]} 城</small>`, `近 12 个月最多：${br.months[peakI]}（${br.up_mom[peakI]} 城）`),
-    kpi(`距 ${ph.peak.m} 高点`, `<span class="down">${pct(ph.from_peak_pct)}</span>`, `已过 ${ph.months_since_peak} 个月<br/>价位回到 ${ph.back_to || "—"}`),
-    kpi("预测的近期成绩", `${Math.round((1 - m3 / f3) * 100)}%<small>优于“不变”</small>`, `${hc.origin} 起 ${hc.months_scored} 个月内，70 城平均误差 ${m3.toFixed(2)} 个百分点（不变：${f3.toFixed(2)}）`),
+    row(`+12 个月（${h12}）`, `<span class="${cls(nat.chg12)}">${pct(nat.chg12)}</span>`, `80% 区间 ${pct(nat.lo12)} ~ ${pct(nat.hi12)}，高于现价的概率约 ${Math.round(nat.p_up12 * 100)}%`),
+    row(`${br.months[last]} 环比上涨的城市`, `${br.up_mom[last]} / ${br.n[last]} 城`, `近 12 个月最多：${br.months[peakI]}（${br.up_mom[peakI]} 城）`),
+    row(`距 ${ph.peak.m} 高点`, `<span class="down">${pct(ph.from_peak_pct)}</span>`, `已过 ${ph.months_since_peak} 个月，价位回到 ${ph.back_to || "—"}`),
+    row("预测的近期成绩", `${Math.round((1 - m3 / f3) * 100)}% 优于“不变”`, `${hc.origin} 起 ${hc.months_scored} 个月内，70 城平均误差 ${m3.toFixed(2)} 个百分点（不变：${f3.toFixed(2)}）`),
   ].join("");
 
   const wf = scorecard.walk_forward;
-  const card = (href, title, body, meta) => `<a class="card-link" href="${href}"><b>${title}</b><span>${body}</span><em>${meta}</em></a>`;
+  const item = (href, title, body, meta) => `<li><a href="${href}"><span class="t1">${title}</span>${icon("chevron-right", 18).replace('class="icon"', 'class="icon chev"')}<span class="t2">${body}</span><span class="t3">${meta}</span></a></li>`;
   document.querySelector("#entries").innerHTML = [
-    card("cities.html", "城市榜", `70 城按趋势强度排序，${counts["寒"] || 0} 座“寒”、${warmHot} 座“温/热”`, `${vintage.dataThrough} · 点城市看区县`),
-    card("stats.html", "数据统计", "层级走势、上涨城市数、同比热力图、宏观、租金收益率", vintage.describe("cum.json", { basis: false })),
-    card("forecast.html", "预测逻辑", `+${vintage.forecast.reliable_through} 个月比“不变”准 ${Math.round(wf.skill_vs_flat[wf.horizons.indexOf(vintage.forecast.reliable_through)] * 100)}%；+${wf.horizons[wf.horizons.length - 1]} 个月仅 ${Math.round(wf.skill_vs_flat[wf.skill_vs_flat.length - 1] * 100)}%`, `回测起点 ${wf.scored_from} 起 · 账本 ${scorecard.ledger.length} 期`),
-    card("data.html", "数据与方法", "来源、口径、缺口、对账结果与下载", `下一期预计 ${vintage.nextRelease}`),
+    item("cities.html", "城市榜", `70 城按趋势强度排序，${counts["寒"] || 0} 座“寒”、${warmHot} 座“温/热”`, `${vintage.dataThrough} · 点城市看走势、预测与区县`),
+    item("stats.html", "数据统计", "层级走势、上涨城市数、同比热力图、宏观、租金收益率", vintage.describe("cum.json", { basis: false })),
+    item("forecast.html", "预测逻辑", `+${vintage.forecast.reliable_through} 个月比“不变”准 ${Math.round(wf.skill_vs_flat[wf.horizons.indexOf(vintage.forecast.reliable_through)] * 100)}%；+${wf.horizons[wf.horizons.length - 1]} 个月比“不变”${wf.skill_vs_flat[wf.skill_vs_flat.length - 1] < 0 ? "还差" : "仅好"} ${Math.abs(Math.round(wf.skill_vs_flat[wf.skill_vs_flat.length - 1] * 100))}%`, `回测起点 ${wf.scored_from} 起 · 账本 ${scorecard.ledger.length} 期`),
+    item("data.html", "数据与方法", "来源、口径、缺口、对账结果与下载", `下一期预计 ${vintage.nextRelease}`),
   ].join("");
 });

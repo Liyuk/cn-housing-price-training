@@ -1,20 +1,21 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>城市 · 趋势看板</title>
-  <meta name="description" content="单个城市的价格走势、折线与 K 线、36 个月概率预测、区县价格与租金。" />
+  <meta name="description" content="单个城市的价格走势、折线与 K 线、概率预测、区县价格与租金。" />
   <meta name="color-scheme" content="dark light" />
-  <script>try { document.documentElement.dataset.theme = localStorage.getItem("theme") || "dark"; } catch (e) {}</script>
+  <script>try { var t = localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); document.documentElement.dataset.theme = t; } catch (e) {}</script>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="preload" href="assets/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="assets/styles.css" />
 </head>
 <body>
   <div id="shell-header"></div>
   <main class="wrap">
     <section class="page-head" id="city-head"></section>
-    <div class="city-tools"><label for="city-picker" class="dim">切换城市</label> <select class="search" id="city-picker"></select> <a href="cities.html" class="dim">← 城市榜</a></div>
+    <div class="city-tools"><label for="city-picker">切换城市</label> <select class="search" id="city-picker"></select> <a href="cities.html" id="back-link"></a></div>
     <section class="block tight city-only">
       <div class="facts" id="city-facts"></div>
       <div class="panel hero">
@@ -24,7 +25,7 @@
       </div>
     </section>
     <section class="block city-only">
-      <div class="sec-head"><h2>未来 36 个月</h2><p id="city-fan-note"></p></div>
+      <div class="sec-head"><h2>未来 <span data-fill="horizon"></span> 个月</h2><p id="city-fan-note"></p></div>
       <div class="panel card" id="city-fan"></div>
     </section>
     <section class="block city-only">

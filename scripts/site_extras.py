@@ -120,7 +120,7 @@ def write_downloads(out_dir: Path, panel_path: Path, paths_csv: Path, board: dic
        "70 城新房/二手住宅价格指数（环比、同比），含来源口径 methodology 与数据质量 quality（low_consistency = 环比与同比不自洽，勿连乘）")
     if paths_csv.exists():
         gz("city_forecast_quantiles.csv.gz", pd.read_csv(paths_csv),
-           "70 城 + 全国未来 36 个月预测分位数（指数，预测起点月 = 100）")
+           "70 城 + 全国未来逐月预测分位数（指数，预测起点月 = 100）；+13 个月起为情景")
     board_csv = out_dir / "city_board.csv"
     pd.DataFrame(board["rows"]).drop(columns=["spark"]).to_csv(board_csv, index=False, encoding="utf-8-sig")
     files.append({"file": "downloads/city_board.csv", "bytes": board_csv.stat().st_size, "note": "城市榜单当期快照"})

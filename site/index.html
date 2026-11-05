@@ -1,13 +1,14 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>趋势看板 · 中国 70 城二手住宅价格趋势与概率预测</title>
   <meta name="description" content="国家统计局 70 城二手住宅价格指数的长期趋势看板：寒/凉/平/温/热、概率预测、折线与 K 线、逐月回测检验。" />
   <meta name="color-scheme" content="dark light" />
-  <script>try { document.documentElement.dataset.theme = localStorage.getItem("theme") || "dark"; } catch (e) {}</script>
+  <script>try { var t = localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); document.documentElement.dataset.theme = t; } catch (e) {}</script>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="preload" href="assets/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="assets/styles.css" />
 </head>
 <body>
@@ -18,17 +19,17 @@
       <p class="lead" id="lead"></p>
       <div class="panel hero">
         <div class="hero-head">
-          <h2>全国二手住宅价格：历史与未来 36 个月</h2>
+          <h2>全国二手住宅价格：历史与未来 <span data-fill="horizon"></span> 个月</h2>
           <span class="sub" data-vintage="cum.json"></span>
         </div>
         <div id="hero-view"></div>
         <p class="foot" id="hero-foot"></p>
-        <div class="kpis" id="kpis"></div>
+        <table class="kv" id="kpis" aria-label="关键数字"></table>
       </div>
     </section>
     <section class="block">
       <div class="sec-head"><h2>往下看</h2></div>
-      <div class="cards" id="entries"></div>
+      <ul class="list" id="entries"></ul>
     </section>
   </main>
   <div id="shell-footer"></div>
