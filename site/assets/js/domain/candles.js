@@ -100,7 +100,7 @@ export async function createCandleChart(el, theme) {
       const end = f ? f.median[f.median.length - 1].time : state.candles[state.candles.length - 1].time;
       if (state.rangeYears === "all") chart.timeScale().fitContent();
       else {
-        const from = `${addMonths(end.slice(0, 7), -12 * Number(state.rangeYears) - (f ? 36 : 0))}-01`;
+        const from = `${addMonths(end.slice(0, 7), -12 * Number(state.rangeYears) - (f ? f.median.length - 1 : 0))}-01`;
         chart.timeScale().setVisibleRange({ from: from < first ? first : from, to: end });
       }
     },

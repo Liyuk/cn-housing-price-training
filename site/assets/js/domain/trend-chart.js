@@ -155,7 +155,7 @@ export function buildTrendOption(data, region, { compare = false, range = "all",
 export function fanTable(fanAll, region, origin, zones = DEFAULT_ZONES) {
   const fan = fanAll.regions[region];
   if (!fan) return "";
-  const rows = [1, 3, 6, 12, 24, 36].filter((h) => h <= fanAll.fc_months.length).map((h) => {
+  const rows = [1, 3, 6, 12, 24, 36, 48, 60].filter((h) => h <= fanAll.fc_months.length).map((h) => {
     const c = (k) => pct(fan[k][h - 1] - 100, 1);
     const zone = h <= zones.reliable ? "可作预测" : h <= zones.caution ? "谨慎参考" : "仅作情景";
     return `<tr><td>${fanAll.fc_months[h - 1]}（+${h} 个月）</td><td class="${cls(fan.q500[h - 1] - 100)}"><b>${c("q500")}</b></td><td>${c("q100")} ~ ${c("q900")}</td><td>${c("q025")} ~ ${c("q975")}</td><td>${zone}</td></tr>`;

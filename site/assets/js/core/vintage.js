@@ -46,7 +46,7 @@ export function createVintage(manifest) {
       root.querySelectorAll("[data-fill]").forEach((el) => {
         const key = el.dataset.fill;
         const map = { dataThrough: manifest.data_through, builtAt: manifest.built_at, nextRelease: manifest.next_release_estimate,
-          forecastOrigin: manifest.forecast.origin, forecastEnd: manifest.forecast.end };
+          forecastOrigin: manifest.forecast.origin, forecastEnd: manifest.forecast.end, horizon: String(manifest.forecast.horizon_months) };
         if (key in map) el.textContent = map[key];
       });
     },

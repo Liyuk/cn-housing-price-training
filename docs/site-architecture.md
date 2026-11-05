@@ -63,3 +63,15 @@ assets/js/pages/   index.js cities.js city.js stats.js forecast.js data.js paper
 | 区县 · 月度价格/租金/收益率 | creprice 月报，每页仅前 10 名区，第三方口径；首批 12 个大城市 |
 | 区县 · 成交量 | 仅北京网签（快照/年度） |
 | 小区/楼盘 | 无合规的批量来源，**不做**（城市页明确说明，不放空壳） |
+
+## 设计系统（2026-11-05 重做）
+
+| 层 | 内容 |
+|---|---|
+| 底座 | shadcn/ui zinc 主题的 token 与组件规格（`site/assets/styles.css` 顶部注释写明来源） |
+| 规则 | Impeccable 的 Operate 模式：界面单色、颜色只表示数据、一个字体族、固定字号、边框做层级、无装饰动效、不用弹窗 |
+| 数据色 | 金（研究对象）/ 蓝（对照）/ 橙（提示），经 dataviz 校验器在 `#09090b` 与 `#ffffff` 上验证；温度色阶是蓝↔橙红发散色，始终带文字 |
+| 图标 | Lucide，`core/icons.js` |
+| 自动检查 | `scripts/design_check.py`（对比度实算 + 10 项禁用模式），`tests/test_design_check.py` 含“坏样本必须被抓住”的负面测试 |
+
+删除测试的结果：`口径说明` 弹窗与数据页的"口径要点"重复，已删弹窗，内容并入 `data.html#definitions`，由 `domain/definitions.js` 渲染（日期来自 manifest）；shell 因此不再包含任何页面内容，只负责页眉导航与页脚。

@@ -14,3 +14,5 @@ data/processed/chronos2_paths.json
 !reports/probabilistic_forecast_backtest.json
 !reports/data_update_log.json
 .claude/
+!reports/paper_algorithm_audit.json
+!reports/acceptance_*.md

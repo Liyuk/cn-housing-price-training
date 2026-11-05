@@ -5,12 +5,13 @@
 import { tok } from "../core/theme.js";
 import { kit } from "../core/charts.js";
 import { pct } from "../core/format.js";
+import { icon } from "../core/icons.js";
 
 export const MODEL_LABEL = {
   naive: "上月持续", drift12: "12 月均值", ar1: "AR(1) 回归", damped: "阻尼趋势", global: "跨城市 GBM",
-  chronos2: "Chronos-2（零样本）", ensemble: "组合（本站预测）", flat: "价格不变（基准）",
+  damped_shrunk: "收缩阻尼趋势", chronos2: "Chronos-2（零样本）", ensemble: "组合（本站预测）", flat: "价格不变（基准）",
 };
-const verdict = (ok) => `<span class="verdict ${ok ? "in" : "out"}">${ok ? "✓ 区间内" : "✗ 区间外"}</span>`;
+const verdict = (ok) => `<span class="verdict ${ok ? "in" : "out"}">${icon(ok ? "check" : "x", 14)}${ok ? "区间内" : "区间外"}</span>`;
 const inside = (a, lo, hi) => a >= lo && a <= hi;
 
 export function renderHindcast(sc, tableEl, calloutEl) {
@@ -33,10 +34,10 @@ export function renderHindcast(sc, tableEl, calloutEl) {
     `<b>v0.2 论文模型</b>：北京有 ${bjOut} / ${bj.length} 个月高于其区间上沿，全国 ${nat[nat.length - 1].actual > nat[nat.length - 1].high ? "最后一个月也高于区间上沿" : "仍在区间内，但贴近上沿"}——其趋势成分滞后于拐点，区间也偏窄。`;
 }
 
-export function renderLedger(sc, el, nextRelease) {
+export function renderLedger(sc, el, nextRelease, horizon) {
   const entries = (sc.ledger || []).slice().reverse();
   el.innerHTML = entries.map((e) => {
-    const head = `<p style="margin:0 0 6px"><b>${e.origin}</b> 的预测已冻结于 <code>${e.frozen_file}</code>（含 70 城 × 36 个月的全部分位数）。`;
+    const head = `<p style="margin:0 0 6px"><b>${e.origin}</b> 的预测已冻结于 <code>${e.frozen_file}</code>（含 70 城 × ${horizon} 个月的全部分位数）。`;
     if (!e.months_scored) return head + `最新数据仍是 ${e.latest_data}，<b>等待下一期官方数据公布后自动评分</b>（预计 ${nextRelease}，估计值）。</p>`;
     const rows = e.scored.map((x) => {
       const n = x.national;
@@ -48,17 +49,21 @@ export function renderLedger(sc, el, nextRelease) {
 
 export function renderModelTable(sc, tableEl, footEl, nOriginsEl) {
   const w = sc.walk_forward, hs = w.horizons;
-  const order = ["flat", "naive", "drift12", "ar1", "damped", "global", "chronos2", "ensemble"];
-  const best = hs.map((h) => Math.min(...order.filter((m) => m !== "flat" && !(m === "chronos2" && h > 12)).map((m) => w.mae[m][h]).filter((v) => v != null)));
+  const order = ["flat", "naive", "drift12", "ar1", "damped", "damped_shrunk", "global", "chronos2", "ensemble"];
+  const horizonOf = (m) => (m === "chronos2" ? 12 : m === "global" ? 36 : Infinity);   // models that are not run past their trained horizon
+  const best = hs.map((h) => Math.min(...order.filter((m) => m !== "flat" && h <= horizonOf(m)).map((m) => w.mae[m][h]).filter((v) => v != null)));
   const rows = order.map((m) => `<tr><td>${m === "ensemble" ? "<b>" : ""}${MODEL_LABEL[m]}${m === "ensemble" ? "</b>" : ""}</td>` + hs.map((h, i) => {
     const v = w.mae[m] && w.mae[m][h];
-    if (v == null || (m === "chronos2" && h > 12)) return '<td class="dim">—</td>';
+    if (v == null || h > horizonOf(m)) return '<td class="dim">—</td>';
     return `<td class="num ${m !== "flat" && v === best[i] ? "best" : ""}">${v.toFixed(2)}</td>`;
   }).join("") + "</tr>").join("");
   tableEl.innerHTML = `<table class="plain"><thead><tr><th>模型</th>${hs.map((h) => `<th>+${h} 个月</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table>`;
   nOriginsEl.textContent = w.n_origins;
-  footEl.innerHTML = `金色为每列最小误差。回测起点为 ${w.scored_from} 起每 3 个月一次，每个起点的权重与区间只用当时已公布的数据。` +
-    `13 个月以后组合固定使用阻尼趋势（因此与其数值相同）；Chronos-2 只预测到 12 个月。<b>这条规则不是盲选</b>：它是在同一回测里看到阻尼趋势是长期限最佳单模型之后定下的，所以 +24、+36 两列偏乐观。12 个月处最佳单模型也是阻尼趋势而不是组合——组合的价值在于不必事先知道哪个模型会赢。`;
+  const last = hs[hs.length - 1], skillLast = Math.round(w.skill_vs_flat[hs.indexOf(last)] * 100);
+  footEl.innerHTML = `金色为每列最小误差。回测起点为 ${w.scored_from} 起每 3 个月一次（${w.n_origins} 个），每个起点的权重与区间只用当时已公布的数据。` +
+    `13 个月以后组合固定使用收缩阻尼趋势（所以与其数值相同）；Chronos-2 只预测到 12 个月，跨城市 GBM 到 36 个月。` +
+    `<b>这条长期规则不是盲选</b>：阻尼系数在 0.90–0.96 之间结果几乎不变，不阻尼（系数 1）则明显更差；但“收缩 40%”是在同一回测里从三个取值中选的，所以 +24 个月的成绩略偏乐观。` +
+    `<b>+${last} 个月比“价格不变”${skillLast >= 0 ? "好" : "还差"} ${Math.abs(skillLast)}%</b>：只有 2019–2021 年上涨期的起点能检验到这么远，动量外推在转折点上失效——五年期只能当情景。`;
 }
 
 export function skillOption(sc) {

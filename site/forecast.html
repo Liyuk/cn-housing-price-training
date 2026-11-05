@@ -1,13 +1,14 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>预测逻辑 · 趋势看板</title>
   <meta name="description" content="预测怎么做、靠不靠谱：模型与组合、区间、实战回放、回测与预测账本。" />
   <meta name="color-scheme" content="dark light" />
-  <script>try { document.documentElement.dataset.theme = localStorage.getItem("theme") || "dark"; } catch (e) {}</script>
+  <script>try { var t = localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); document.documentElement.dataset.theme = t; } catch (e) {}</script>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="preload" href="assets/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="assets/styles.css" />
 </head>
 <body>
@@ -24,9 +25,9 @@
       <div class="sec-head"><h2>预测是怎么做的</h2></div>
       <div class="panel card">
         <ul class="src-list">
-          <li><b>目标</b>：每座城市二手住宅指数未来 1–36 个月的累计变化；全国由 70 城自下而上汇总。</li>
-          <li><b>基础模型</b>：上月持续、12 月均值、AR(1) 回归、阻尼趋势、跨城市 GBM，以及零样本基础模型 Chronos-2。</li>
-          <li><b>组合</b>：+12 个月内取历史误差最小的 2 个模型平均（只用当时已公布的数据）；之后固定用阻尼趋势。</li>
+          <li><b>目标</b>：每座城市二手住宅指数未来 1–<span data-fill="horizon"></span> 个月的累计变化；全国由 70 城自下而上汇总。</li>
+          <li><b>基础模型</b>：上月持续、12 月均值、AR(1) 回归、阻尼趋势、收缩阻尼趋势、跨城市 GBM，以及零样本基础模型 Chronos-2。</li>
+          <li><b>组合</b>：+12 个月内取历史误差最小的 2 个模型平均（只用当时已公布的数据）；之后固定用<b>收缩阻尼趋势</b>——阻尼系数 0.96/月，每个城市的动量向所属层级的均值收缩 40%。</li>
           <li><b>区间</b>：宽度 = 月度波动 × √期限 + 趋势不稳定度 × 期限；取历史误差的经验分位数，近期的起点权重更大（半衰期约 12 个月）。</li>
           <li><b>数据范围</b>：只用现行口径的月份（口径断点之后至 <span data-fill="dataThrough"></span>），旧口径不进模型。</li>
           <li><b>不含</b>：政策、利率、人口等外生变量；预测的是价格指数，不是每平方米成交价。</li>
@@ -34,7 +35,7 @@
         <div class="zones">
           <div class="zone"><span class="tagz up" id="zone-reliable"></span><h4>可作预测</h4>用回测学到的权重组合；到 +<span id="rel-h"></span> 个月，80% 区间实际覆盖 <span id="rel-cov"></span>%，比“不变”准 <span id="rel-skill"></span>%，方向命中率约 <span id="rel-dir"></span>%。</div>
           <div class="zone"><span class="tagz flatc" id="zone-caution"></span><h4>谨慎参考</h4>固定用阻尼趋势外推，这条规则是看到结果后定的，成绩偏乐观；到 +<span id="cau-h"></span> 个月，覆盖 <span id="cau-cov"></span>%，比“不变”准 <span id="cau-skill"></span>%。</div>
-          <div class="zone"><span class="tagz down" id="zone-scenario"></span><h4>只是情景</h4>到 +<span id="sce-h"></span> 个月，比“不变”只准 <span id="sce-skill"></span>%，80% 区间覆盖 <span id="sce-cov"></span>%：当作情景，不当作预测。</div>
+          <div class="zone"><span class="tagz down" id="zone-scenario"></span><h4>只是情景</h4>到 +<span id="sce-h"></span> 个月，<span id="sce-skill"></span>，80% 区间只覆盖 <span id="sce-cov"></span>%：当作情景，不当作预测。</div>
         </div>
       </div>
     </section>

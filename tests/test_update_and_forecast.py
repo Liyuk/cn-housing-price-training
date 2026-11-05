@@ -15,8 +15,10 @@ import pandas as pd
 from src.collector import normalize_city, parse_index_tables
 from src.forecast_ledger import freeze, score_ledger
 from src.probabilistic_forecast import (
+    LONG_RULE,
     MODELS,
     band_scale,
+    shrunk_damped,
     weighted_quantile,
     _local_forecast,
     city_tier,
@@ -187,7 +189,8 @@ class LearnAtTests(unittest.TestCase):
         horizon = 24
         recs = _records(self.ORIGINS, horizon, [0.01, 0.005, 0.02, 0.03, 0.02])
         w, *_ = learn_at(recs, self.ORIGINS, "2023-01", horizon)
-        self.assertEqual(w[MODELS.index("damped"), 20], 1.0)
+        self.assertEqual(w[MODELS.index(LONG_RULE), 20], 1.0)
+        self.assertEqual(float(w[:, 20].sum()), 1.0)             # and nothing else carries weight there
 
     def test_quantile_bands_never_narrow_with_horizon(self):
         horizon = 12
@@ -203,6 +206,62 @@ class LearnAtTests(unittest.TestCase):
         paths = {"naive": np.ones((2, 3)), "damped": np.zeros((2, 3))}
         w = np.zeros((len(MODELS), 3)); w[MODELS.index("naive")] = 0.25; w[MODELS.index("damped")] = 0.75
         np.testing.assert_allclose(ensemble_path(paths, w), 0.25)
+
+
+class PaperReversionTests(unittest.TestCase):
+    """The v0.2 reversion step closes rho of the gap in one month; AR(1) closes 1 - rho (see the audit)."""
+
+    def setUp(self):
+        from src.five_year_forecast import _component_forecasts
+        self.cf = _component_forecasts
+        rng = np.random.default_rng(1)
+        vals = 100 + rng.normal(0, 0.2, 60)
+        vals[-12:] -= 0.5                                            # anchor sits below the long-run mean
+        self.hist = pd.Series(vals, index=pd.period_range("2020-01", periods=60, freq="M").to_timestamp())
+        self.gap = float(vals.mean() - vals[-12:].mean())
+        self.anchor = float(vals[-12:].mean())
+
+    def test_default_reproduces_the_published_behaviour(self):
+        rho = 0.9
+        _, rev, _ = self.cf(self.hist, 3, rho)
+        closed = (rev[0] - self.anchor) / self.gap
+        self.assertAlmostEqual(closed, rho, places=6)                # closes rho of the gap at once
+
+    def test_ar1_fix_closes_one_minus_rho(self):
+        rho = 0.9
+        _, rev, _ = self.cf(self.hist, 3, rho, ar1_fix=True)
+        self.assertAlmostEqual((rev[0] - self.anchor) / self.gap, 1 - rho, places=6)
+        half = float(np.log(0.5) / np.log(rho))                      # the half-life the paper quotes now holds
+        _, long_rev, _ = self.cf(self.hist, 200, rho, ar1_fix=True)
+        k = int(round(half))
+        self.assertAlmostEqual((long_rev[k - 1] - self.anchor) / self.gap, 1 - rho ** k, places=6)
+
+
+class ShrunkDampedTests(unittest.TestCase):
+    def _hist(self):
+        rng = np.random.default_rng(3)
+        cities = ["北京", "上海", "广州", "深圳", "成都", "杭州", "唐山", "洛阳"]          # tiers 1, 1, 1, 1, 2, 2, 3, 3
+        return pd.DataFrame(rng.normal(-0.003, 0.003, (36, len(cities))), columns=cities,
+                            index=pd.period_range("2023-01", periods=36, freq="M").strftime("%Y-%m"))
+
+    def test_lambda_one_is_the_plain_damped_trend(self):
+        from src.probabilistic_forecast import _local_forecast
+        hist = self._hist()
+        plain = np.stack([np.cumsum(_local_forecast("damped", hist[c].to_numpy(), 12)) for c in hist.columns])
+        np.testing.assert_allclose(shrunk_damped(hist, 12, lam=1.0), plain, atol=1e-12)
+
+    def test_lambda_zero_gives_every_city_in_a_tier_the_same_path(self):
+        out = shrunk_damped(self._hist(), 12, lam=0.0)
+        np.testing.assert_allclose(out[0], out[1])                     # two tier-1 cities
+        np.testing.assert_allclose(out[6], out[7])                     # two tier-3 cities
+        self.assertGreater(float(np.abs(out[0] - out[6]).max()), 0)    # tiers still differ
+
+    def test_shrinking_preserves_each_tiers_average_momentum(self):
+        hist, tiers = self._hist(), np.array([1, 1, 1, 1, 2, 2, 3, 3])
+        raw, shrunk = shrunk_damped(hist, 12, lam=1.0), shrunk_damped(hist, 12, lam=0.5)
+        for t in (1, 2, 3):
+            np.testing.assert_allclose(raw[tiers == t].mean(axis=0), shrunk[tiers == t].mean(axis=0), atol=1e-12)
+        self.assertLess(float(shrunk[tiers == 1].std(axis=0).max()), float(raw[tiers == 1].std(axis=0).max()))
 
 
 class BandScaleTests(unittest.TestCase):

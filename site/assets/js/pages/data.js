@@ -1,6 +1,7 @@
 import { boot } from "../core/boot.js";
 import { Data } from "../core/data.js";
 import { esc, grp, range } from "../core/format.js";
+import { renderDefinitions } from "../domain/definitions.js";
 
 const KIND = { official: "官方", "official+legacy": "官方 + 旧口径镜像", third_party: "第三方", model: "模型", derived: "派生", unavailable: "无" };
 const METHOD = { current: "官方页面", current_cirea: "CIREA 转载", current_cirea_legacy_doc: "CIREA 旧文档", legacy_mirror: "旧口径镜像", mirror_filled: "镜像补缺" };
@@ -9,11 +10,12 @@ const kb = (b) => (b >= 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.max(1,
 boot("data", ["meta"], ({ data, vintage, manifest }) => {
   const $ = (s) => document.querySelector(s);
   const c = data.meta.cirea, mi = c.mirror;
+  renderDefinitions($("#defs-body"), vintage);
 
   $("#coverage").innerHTML = `<div style="overflow-x:auto"><table class="plain"><thead><tr><th class="l">数据集</th><th class="l">来源</th><th class="l">粒度</th><th class="l">频率</th><th>起止</th><th>期数</th><th class="l">缺口</th></tr></thead><tbody>` +
     manifest.datasets.map((d) => {
       const gaps = d.kind === "unavailable" ? "—" : d.missing.length ? `${d.missing.length} 个月（${d.missing.join("、")}）` : "无";
-      return `<tr class="${d.kind === "unavailable" ? "dim" : ""}"><td class="l"><b>${esc(d.name)}</b></td><td class="l">${esc(d.source)}</td><td class="l">${esc(d.granularity)}</td><td class="l">${esc(d.freq)}</td><td class="num">${d.start ? range(d.start, d.end) : "—"}</td><td class="num">${d.n || "—"}</td><td class="l">${gaps}</td></tr>`;
+      return `<tr class="${d.kind === "unavailable" ? "dim" : ""}"><td class="l"><b>${esc(d.name)}</b></td><td class="l">${esc(d.source)}</td><td class="l">${esc(d.granularity)}</td><td class="l nw">${esc(d.freq)}</td><td class="num">${d.start ? range(d.start, d.end) : "—"}</td><td class="num">${d.n || "—"}</td><td class="l">${gaps}</td></tr>`;
     }).join("") + "</tbody></table></div>";
   const sh = manifest.datasets[0].by_methodology || {};
   const notes = manifest.datasets.filter((d) => d.note).map((d) => `${esc(d.name)}：${esc(d.note)}`).join("；");

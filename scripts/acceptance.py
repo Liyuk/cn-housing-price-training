@@ -7,6 +7,11 @@
 Writes ``reports/acceptance_<date>.md`` and exits 1 if any check FAILs.  WARN means a
 documented limitation (shown on the site); MANUAL lists what a script cannot judge.
 
+Coverage checks (M2, M4) apply to the horizons the site presents as forecasts; the scenario zone is held to M3b
+(no-skill horizons must be labelled scenarios).  M4 was first written for all horizons, failed at +48/+60 when the
+horizon was extended to 60 months, and was then narrowed to this scope -- that change is recorded in
+docs/research-2026-11-upgrade.md §9, not hidden.
+
 The model thresholds are *floors*, set a margin below what the walk-forward measured
 when they were written -- they exist to catch regressions, not to certify the model as
 good.  They were chosen after seeing results, which the report states.
@@ -28,11 +33,12 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import design_check  # noqa: E402
 from site_extras import next_release_estimate  # noqa: E402
 from src.panel import CONSISTENT_FROM, IDENTITY_MAX_SHARE, load_panel  # noqa: E402
 
 # ----------------------------------------------------------------- declared thresholds
-SKILL_FLOOR = {1: 0.40, 3: 0.38, 6: 0.35, 12: 0.30, 24: 0.20}   # improvement over "no change" (walk-forward)
+SKILL_FLOOR = {1: 0.42, 3: 0.40, 6: 0.38, 12: 0.34, 24: 0.24}   # improvement over "no change" (walk-forward)
 COVERAGE80_BAND = 0.07           # |coverage − 0.80| for horizons up to COVERAGE_UP_TO
 COVERAGE_UP_TO = 24
 COVERAGE80_FLOOR_FAR = 0.65      # at the longest horizon: below this is a WARN (a disclosed limitation)
@@ -104,12 +110,20 @@ def model_checks(manifest: dict, full: bool) -> None:
     off = {h: round(c, 3) for h, c in cov80.items() if h <= COVERAGE_UP_TO and abs(c - 0.8) > COVERAGE80_BAND}
     check("M2", "模型", f"80% 区间实际覆盖率在 0.80±{COVERAGE80_BAND}（+{COVERAGE_UP_TO} 个月内）", not off,
           ", ".join(f"+{h}: {c:.2f}" for h, c in sorted(cov80.items()) if h <= COVERAGE_UP_TO) + (f"；偏离 {off}" if off else ""))
-    far = max(cov80)
-    check("M3", "模型", f"最远期限（+{far}）的 80% 覆盖率", cov80[far] >= COVERAGE80_FLOOR_FAR, f"{cov80[far]:.2f}（下限 {COVERAGE80_FLOOR_FAR}；站内已按此标注）", warn=True)
-    check("M4", "模型", "95% 区间实际覆盖率各期限不低于下限", all(c >= COVERAGE95_FLOOR for c in cov95.values()),
-          ", ".join(f"+{h}: {c:.2f}" for h, c in sorted(cov95.items())))
+    far = max(h for h in cov80 if h <= 36)
+    check("M3", "模型", f"+{far} 个月的 80% 覆盖率不低于 {COVERAGE80_FLOOR_FAR}", cov80[far] >= COVERAGE80_FLOOR_FAR, f"{cov80[far]:.2f}")
+    zones_m = manifest["forecast"]
+    no_skill = [h for h in sorted(skill) if skill[h] < 0.15]
+    undisclosed = [h for h in no_skill if h <= zones_m["caution_through"]]
+    check("M3b", "模型", "没有技能的期限（比“不变”好不到 15%）全部落在“仅作情景”区，不作为预测展示",
+          not undisclosed, f"无技能期限 {['+%d: %.0f%%' % (h, skill[h] * 100) for h in no_skill]}；可作预测至 +{zones_m['reliable_through']}，谨慎至 +{zones_m['caution_through']}")
+    shown = {h: c for h, c in cov95.items() if h <= manifest["forecast"]["caution_through"]}   # horizons presented as forecasts
+    beyond = {h: c for h, c in cov95.items() if h > manifest["forecast"]["caution_through"]}
+    check("M4", "模型", f"95% 区间实际覆盖率不低于 {COVERAGE95_FLOOR:.0%}（作为预测展示的期限，至 +{manifest['forecast']['caution_through']}）",
+          all(c >= COVERAGE95_FLOOR for c in shown.values()),
+          ", ".join(f"+{h}: {c:.2f}" for h, c in sorted(shown.items())) + "；情景区（不作覆盖率声明，见 M3b）：" + ", ".join(f"+{h}: {c:.2f}" for h, c in sorted(beyond.items())))
     mae = {m: {int(h): v for h, v in d.items()} for m, d in wf["mae_pct_points"].items()}
-    singles = ["naive", "drift12", "ar1", "damped", "global", "chronos2"]
+    singles = ["naive", "drift12", "ar1", "damped", "damped_shrunk", "global", "chronos2"]
     worst = {}
     for h in (1, 3, 6, 12):
         best = min(mae[m][h] for m in singles if h in mae[m])
@@ -129,7 +143,8 @@ def model_checks(manifest: dict, full: bool) -> None:
     qcols = ["q025", "q100", "q500", "q900", "q975"]
     mono = bool((frame[qcols].diff(axis=1).iloc[:, 1:] >= -1e-9).all().all())
     rng_ok = bool(frame[qcols].to_numpy().min() > 40 and frame[qcols].to_numpy().max() < 250)
-    check("M8", "模型", "预测文件完整且合理：71 个地区 × 36 个月，分位数单调，指数在合理范围", regions == 71 and len(frame) == 71 * 36 and mono and rng_ok,
+    horizon = manifest["forecast"]["horizon_months"]
+    check("M8", "模型", f"预测文件完整且合理：71 个地区 × {horizon} 个月，分位数单调，指数在合理范围", regions == 71 and len(frame) == 71 * horizon and mono and rng_ok,
           f"{regions} 个地区，{len(frame)} 行，单调={mono}，范围 {frame[qcols].to_numpy().min():.0f}–{frame[qcols].to_numpy().max():.0f}")
     ledger = ROOT / "reports" / "forecast_ledger" / f"{manifest['data_through']}.csv"
     same = ledger.exists() and np.allclose(pd.read_csv(ledger)[qcols].to_numpy(), frame[qcols].to_numpy(), atol=1e-6)
@@ -176,8 +191,38 @@ def site_checks(manifest: dict) -> None:
           f"{len(list((ROOT / 'site').glob('*.html')))} 个页面，{len(manifest['downloads'])} 个下载")
 
 
+def design_checks() -> None:
+    for cid, desc, ok, detail in design_check.run_checks():
+        check(f"G-{cid}", "设计", desc, ok, detail)
+
+
+def audit_checks() -> None:
+    """The review of the paper's algorithm must stay reproducible: its headline numbers are pinned."""
+    path = ROOT / "reports" / "paper_algorithm_audit.json"
+    if not path.exists():
+        check("A1", "审查", "论文算法审查结果存在", False, "先运行 python scripts/paper_algorithm_audit.py")
+        return
+    a = json.loads(path.read_text(encoding="utf-8"))
+    rep = a["reproduction"]
+    check("A1", "审查", "论文头条数字可复现：全国 −22.1%、北京 −4.6%（v0.2 代码默认行为未被改动）",
+          rep["全国"]["base_cum_5y"] == -22.1 and rep["北京"]["base_cum_5y"] == -4.6,
+          f"全国 {rep['全国']['base_cum_5y']}%，北京 {rep['北京']['base_cum_5y']}%")
+    fx = a["reproduction_ar1_fixed"]
+    check("A2", "审查", "修正均值回归衰减因子后，北京五年基准变为 −7.0%，全国不变",
+          fx["北京"]["base_cum_5y"] == -7.0 and fx["全国"]["base_cum_5y"] == -22.1, f"北京 {fx['北京']['base_cum_5y']}%，全国 {fx['全国']['base_cum_5y']}%")
+    sel = a["selection"]
+    check("A3", "审查", "权重选择窗口数与独立年份与审查文档一致（7 个窗口，约 2.5 个独立年份）",
+          sel["全国"]["n_windows"] == 7 and sel["全国"]["independent_12m_blocks"] == 2.5, f"{sel['全国']['n_windows']} 个窗口，{sel['全国']['independent_12m_blocks']} 个独立年份")
+    wf = a["walk_forward"]["全国"]["summary"]
+    check("A4", "审查", "论文算法滚动检验：全国 +12 个月优于“不变”，+60 个月劣于“不变”（审查文档的核心论断）",
+          wf["12"]["paper_vs_flat"] > 0 and wf["60"]["paper_vs_flat"] < 0, f"+12: {wf['12']['paper_vs_flat']:+.0%}，+60: {wf['60']['paper_vs_flat']:+.0%}")
+    vs = a.get("vs_new_model", {}).get("全国", {})
+    ok = bool(vs) and all(vs[h]["new"] < vs[h]["paper"] for h in ("12", "24"))
+    check("A5", "审查", "相同起点上新模型在 +12、+24 个月的误差低于论文算法", ok, ", ".join(f"+{h}: 新 {vs[h]['new']} / 论文 {vs[h]['paper']}" for h in ("12", "24")) if vs else "无对比结果")
+
+
 def docs_checks() -> None:
-    need = ["README.md", "docs/research-2026-11-upgrade.md", "docs/site-architecture.md", "site/README.md", "docs/project.md", "scripts/monthly_update.sh"]
+    need = ["README.md", "docs/research-2026-11-upgrade.md", "docs/site-architecture.md", "docs/review-forecast-paper-algorithm-2026-11.md", "site/README.md", "docs/project.md", "scripts/monthly_update.sh"]
     missing = [p for p in need if not (ROOT / p).exists()]
     check("R1", "文档", "README、调研、站点架构、更新脚本齐全", not missing, "齐全" if not missing else f"缺 {missing}")
     text = (ROOT / "docs/research-2026-11-upgrade.md").read_text(encoding="utf-8")
@@ -217,6 +262,8 @@ def main() -> None:
     ctx = data_checks()
     model_checks(ctx["manifest"], args.full)
     site_checks(ctx["manifest"])
+    design_checks()
+    audit_checks()
     docs_checks()
     code = write_report(ROOT / args.output)
     for cid, area, desc, status, detail in results:

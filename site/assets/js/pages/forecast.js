@@ -13,7 +13,7 @@ boot("forecast", ["scorecard"], ({ data, vintage }) => {
   $("#fc-end").textContent = f.end;
   $("#hindcast-title").textContent = `先做一次实战检验：${sc.hindcast.origin} 的预测 vs 之后公布的 ${sc.hindcast.months_scored} 个月`;
   renderHindcast(sc, $("#hindcast-table"), $("#hindcast-callout"));
-  renderLedger(sc, $("#ledger"), vintage.nextRelease);
+  renderLedger(sc, $("#ledger"), vintage.nextRelease, vintage.forecast.horizon_months);
   renderModelTable(sc, $("#model-table"), $("#model-foot"), $("#n-origins"));
   mount($("#chart-skill"), () => skillOption(sc));
   mount($("#chart-cover"), () => coverOption(sc));
@@ -26,7 +26,9 @@ boot("forecast", ["scorecard"], ({ data, vintage }) => {
   $("#rel-h").textContent = f.reliable_through; $("#rel-cov").textContent = at(wf.coverage80, f.reliable_through);
   $("#rel-skill").textContent = at(wf.skill_vs_flat, f.reliable_through); $("#rel-dir").textContent = at(wf.direction, f.reliable_through);
   $("#cau-h").textContent = f.caution_through; $("#cau-cov").textContent = at(wf.coverage80, f.caution_through); $("#cau-skill").textContent = at(wf.skill_vs_flat, f.caution_through);
-  $("#sce-h").textContent = f.horizon_months; $("#sce-cov").textContent = at(wf.coverage80, f.horizon_months); $("#sce-skill").textContent = at(wf.skill_vs_flat, f.horizon_months);
+  const skillEnd = at(wf.skill_vs_flat, f.horizon_months);
+  $("#sce-h").textContent = f.horizon_months; $("#sce-cov").textContent = at(wf.coverage80, f.horizon_months);
+  $("#sce-skill").textContent = skillEnd >= 0 ? `比“不变”准 ${skillEnd}%` : `比“不变”还差 ${Math.abs(skillEnd)}%`;
 
   whenVisible($("#scen-card"), async () => {
     const d = await Data.load("district_scenarios");
