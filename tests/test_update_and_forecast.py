@@ -12,12 +12,15 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from src import probabilistic_forecast as pf
 from src.collector import normalize_city, parse_index_tables
 from src.forecast_ledger import freeze, ledger_detail, provenance, score_ledger
 from src.probabilistic_forecast import (
     LONG_RULE,
     MODELS,
     band_scale,
+    build_targets,
+    build_features,
     shrunk_damped,
     weighted_quantile,
     _local_forecast,
@@ -122,6 +125,88 @@ class ForecastHelperTests(unittest.TestCase):
         r, bridged = monthly_returns(frame)
         self.assertTrue(bridged.loc["2020-06", "甲"])
         self.assertAlmostEqual(100 * np.exp(r.loc["2020-06", "甲"]), truth, places=6)
+
+    def test_forecast_inputs_exclude_values_bridged_from_future_yoy(self):
+        months = pd.period_range("2020-01", "2021-12", freq="M").strftime("%Y-%m")
+        rows = [{"month": m, "city": "甲", "market": "new",
+                 "month_on_month": 100.1, "yoy": 101.2} for m in months if m != "2020-06"]
+        causal, bridged = pf.forecast_returns(pd.DataFrame(rows))
+        self.assertTrue(bridged.loc["2020-06", "甲"])
+        self.assertTrue(pd.isna(causal.loc["2020-06", "甲"]))
+        self.assertFalse(pd.isna(causal.loc["2020-05", "甲"]))
+
+    def test_secondhand_forecast_requires_all_observations(self):
+        months = pd.period_range("2020-01", periods=6, freq="M").strftime("%Y-%m")
+        rows = [{"month": m, "city": "甲", "market": "secondhand",
+                 "month_on_month": 100.1, "yoy": 101.2} for m in months if m != "2020-05"]
+        with self.assertRaisesRegex(ValueError, "directly observed"):
+            pf.forecast_returns(pd.DataFrame(rows), require_complete=True)
+
+    def test_features_before_origin_ignore_later_city_and_new_home_data(self):
+        months = pd.period_range("2020-01", periods=36, freq="M").strftime("%Y-%m")
+        returns = pd.DataFrame({"北京": np.arange(36) / 1000, "上海": np.arange(36) / 2000}, index=months)
+        new = returns / 2
+        future_returns, future_new = returns.copy(), new.copy()
+        future_returns.loc[future_returns.index > "2021-12"] += 50
+        future_new.loc[future_new.index > "2021-12"] -= 30
+        a = build_features(returns, new).query('month <= "2021-12"').reset_index(drop=True)
+        b = build_features(future_returns, future_new).query('month <= "2021-12"').reset_index(drop=True)
+        pd.testing.assert_frame_equal(a, b)
+
+    def test_cache_requires_matching_data_parameters_code_and_payload(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            panel, source, cache = root / "panel.csv", root / "model.py", root / "records.pkl"
+            panel.write_text("data-a")
+            source.write_text("model-a")
+            key = pf.records_cache_key(panel, None, 12, "2011-02", "2016-01", 3, [source])
+            cache.write_bytes(b"legacy cache")
+            self.assertFalse(pf.records_cache_valid(cache, key))
+            records = {"2019-01": {"path": [1, 2]}}
+            pf.write_records_cache(cache, records, key)
+            self.assertTrue(pf.records_cache_valid(cache, key))
+            self.assertEqual(pf.read_records_cache(cache, key), records)
+            self.assertNotEqual(key, pf.records_cache_key(panel, None, 24, "2011-02", "2016-01", 3, [source]))
+            panel.write_text("data-b")
+            self.assertNotEqual(key, pf.records_cache_key(panel, None, 12, "2011-02", "2016-01", 3, [source]))
+            panel.write_text("data-a")
+            source.write_text("model-b")
+            self.assertNotEqual(key, pf.records_cache_key(panel, None, 12, "2011-02", "2016-01", 3, [source]))
+            cache.write_bytes(b"changed payload")
+            self.assertFalse(pf.records_cache_valid(cache, key))
+
+    def test_paper_comparison_rejects_legacy_forecast_cache(self):
+        from scripts.paper_algorithm_audit import compare_with_new_model
+        import pickle
+        with tempfile.TemporaryDirectory() as tmp:
+            panel = Path(tmp) / "panel.csv"
+            panel.write_text("month,city,market,month_on_month\n2019-01,北京,secondhand,100.0\n")
+            cache = Path(tmp) / "records.pkl"
+            cache.write_bytes(pickle.dumps({}))
+            with self.assertRaisesRegex(ValueError, "cache"):
+                compare_with_new_model(str(panel), str(cache))
+
+    def test_targets_cover_exactly_the_next_h_months(self):
+        months = pd.period_range("2020-01", periods=6, freq="M").strftime("%Y-%m")
+        returns = pd.DataFrame({"甲": [1., 2., 3., 4., 5., 6.],
+                                "乙": [10., 20., np.nan, 40., 50., 60.]}, index=months)
+        targets = build_targets(returns).set_index(["month", "city"])
+        self.assertEqual(targets.loc[("2020-01", "甲"), "y1"], 2.)
+        self.assertEqual(targets.loc[("2020-01", "甲"), "y2"], 5.)
+        self.assertEqual(targets.loc[("2020-01", "甲"), "y3"], 9.)
+        self.assertTrue(pd.isna(targets.loc[("2020-01", "乙"), "y2"]))
+        self.assertTrue(pd.isna(targets.loc[("2020-05", "甲"), "y2"]))
+
+    def test_completed_targets_do_not_depend_on_future_values(self):
+        months = pd.period_range("2020-01", periods=12, freq="M").strftime("%Y-%m")
+        returns = pd.DataFrame({"甲": np.arange(12, dtype=float), "乙": np.arange(12, dtype=float) * 2}, index=months)
+        changed = returns.copy()
+        changed.loc[changed.index > "2020-07"] += 1000
+        original = build_targets(returns).set_index(["month", "city"])
+        perturbed = build_targets(changed).set_index(["month", "city"])
+        for horizon in (1, 2, 3, 6):
+            eligible = [month for month in months if pd.Period(month, freq="M") + horizon <= pd.Period("2020-07", freq="M")]
+            np.testing.assert_allclose(original.loc[eligible, f"y{horizon}"], perturbed.loc[eligible, f"y{horizon}"])
 
     def test_local_models_return_requested_horizon(self):
         hist = np.log(np.linspace(99.5, 100.3, 60) / 100)

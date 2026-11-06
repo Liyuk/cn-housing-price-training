@@ -16,3 +16,4 @@ data/processed/chronos2_paths.json
 .claude/
 !reports/paper_algorithm_audit.json
 !reports/acceptance_*.md
+data/processed/*.pkl.meta.json
