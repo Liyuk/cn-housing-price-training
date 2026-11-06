@@ -3,6 +3,7 @@
 
 import { pct, cls, addMonths } from "../core/format.js";
 
+export const SCENARIO_SHADE = "rgba(128,128,120,0.07)";
 export const DEFAULT_ZONES = { reliable: 12, caution: 24 }; // overridden by the manifest (computed from the scorecard)
 
 /** Runs of months where the trailing 6-month mean MoM change is positive (>= 3 months long). */
@@ -75,7 +76,7 @@ export function buildTrendOption(data, region, { compare = false, range = "all",
   if (fan) {
     if (zones.caution < F) {
       areas.push([{ xAxis: fm[zones.caution], name: "情景区", label: { show: true, position: "insideTop", color: tok("ink-3"), fontSize: 11.5,
-        formatter: "情景区" }, itemStyle: { color: "rgba(128,128,120,0.07)" } }, { xAxis: fm[F - 1] }]);
+        formatter: "情景区" }, itemStyle: { color: SCENARIO_SHADE } }, { xAxis: fm[F - 1] }]);
     }
   }
   const rb = cum.regime_break && hm.includes(cum.regime_break.month) ? cum.regime_break.month : null;
