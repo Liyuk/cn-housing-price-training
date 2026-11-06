@@ -35,6 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import design_check  # noqa: E402
 from site_extras import next_release_estimate  # noqa: E402
+from src.forecast_ledger import provenance  # noqa: E402
 from src.panel import CONSISTENT_FROM, IDENTITY_MAX_SHARE, load_panel  # noqa: E402
 
 # ----------------------------------------------------------------- declared thresholds
@@ -147,8 +148,11 @@ def model_checks(manifest: dict, full: bool) -> None:
     check("M8", "模型", f"预测文件完整且合理：71 个地区 × {horizon} 个月，分位数单调，指数在合理范围", regions == 71 and len(frame) == 71 * horizon and mono and rng_ok,
           f"{regions} 个地区，{len(frame)} 行，单调={mono}，范围 {frame[qcols].to_numpy().min():.0f}–{frame[qcols].to_numpy().max():.0f}")
     ledger = ROOT / "reports" / "forecast_ledger" / f"{manifest['data_through']}.csv"
-    same = ledger.exists() and np.allclose(pd.read_csv(ledger)[qcols].to_numpy(), frame[qcols].to_numpy(), atol=1e-6)
-    check("M9", "模型", "预测账本已冻结，且与当前预测文件一致", bool(same), f"{ledger.name} {'一致' if same else '缺失或不一致（重新冻结前须确认没有新数据公布）'}")
+    prov = provenance(ledger) if ledger.exists() else None
+    frozen_ok = bool(prov and prov["commit"] and prov["clean"] and prov["rows"] == len(frame))
+    drift = float(np.abs(pd.read_csv(ledger)[qcols].to_numpy() - frame[qcols].to_numpy()).max()) if frozen_ok else None
+    check("M9", "模型", "预测账本已冻结：文件存在、已提交且未被改动、行数与当前预测一致（评分对象永远是冻结文件）", frozen_ok,
+          "缺失、未提交或被改动" if not frozen_ok else (f"{ledger.name} 与当前预测一致" if drift < 1e-6 else f"{ledger.name} 保持冻结；当前预测因冻结后的模型修订与它相差最多 {drift:.2f} 个指数点（评分仍用冻结文件）"))
     zones = manifest["forecast"]
     check("M10", "模型", "可信度分区由回测计算（可作预测 ≤ 谨慎参考 ≤ 预测期）",
           0 < zones["reliable_through"] <= zones["caution_through"] <= zones["horizon_months"],
