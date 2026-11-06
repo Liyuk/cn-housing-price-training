@@ -82,6 +82,26 @@ class SiteContractTests(unittest.TestCase):
         self.assertLessEqual(z["caution_through"], z["horizon_months"])
         self.assertGreater(z["reliable_through"], 0)
 
+    def test_new_home_series_line_up_with_the_second_hand_series(self):
+        load = lambda n: json.loads((SITE / "data" / n).read_text(encoding="utf-8"))
+        cum, new = load("cum.json"), load("cum_new.json")
+        self.assertEqual(cum["months"], new["months"])                                  # overlays are index-aligned in the trend view
+        self.assertEqual(set(cum["series"]), set(new["series"]))
+        self.assertEqual(cum["regime_break"], new["regime_break"])
+        self.assertTrue(all(len(v) == len(new["months"]) for v in new["series"].values()))
+
+    def test_the_ledger_bundle_matches_the_frozen_files_it_describes(self):
+        import hashlib
+        root = SITE.parent
+        ledger = json.loads((SITE / "data" / "ledger.json").read_text(encoding="utf-8"))
+        self.assertTrue(ledger["entries"])
+        for e in ledger["entries"]:
+            frozen = root / e["frozen"]["file"]
+            self.assertEqual(e["frozen"]["sha256"], hashlib.sha256(frozen.read_bytes()).hexdigest(), f"{e['origin']}: bundle is stale")
+            self.assertEqual(len(e["months"]), manifest()["forecast"]["horizon_months"])
+            self.assertLessEqual(len(e["actual"]["months"]), len(e["months"]))
+        self.assertEqual(ledger["entries"][-1]["origin"], manifest()["forecast"]["origin"])   # the latest forecast is in the ledger
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -14,7 +14,7 @@ import pandas as pd
 
 from src import probabilistic_forecast as pf
 from src.collector import normalize_city, parse_index_tables
-from src.forecast_ledger import freeze, score_ledger
+from src.forecast_ledger import freeze, ledger_detail, provenance, score_ledger
 from src.probabilistic_forecast import (
     LONG_RULE,
     MODELS,
@@ -414,6 +414,26 @@ class LedgerTests(unittest.TestCase):
             first = scored["scored"][0]
             self.assertEqual(first["city_inside80"], 1.0)
             self.assertAlmostEqual(first["national"]["actual"], 99.8, places=2)
+
+    def test_ledger_detail_holds_frozen_paths_actuals_and_a_checkable_hash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp) / "ledger"
+            path, _ = freeze(self._forecast(), "2026-09", d)
+            panel = Path(tmp) / "panel.csv"
+            base = [{"month": "2026-09", "city": c, "market": "secondhand", "month_on_month": 100.0, "yoy": 100.0} for c in ("甲", "乙")]
+            pd.DataFrame(base).to_csv(panel, index=False)
+            waiting = ledger_detail(str(panel), d, with_provenance=False)["entries"][0]
+            self.assertEqual(waiting["actual"], {"months": [], "national": [], "cities": {}})
+            self.assertEqual(sorted(waiting["cities"]), ["乙", "甲"])
+            self.assertEqual(len(waiting["national"]["q500"]), 2)
+            nxt = base + [{"month": "2026-10", "city": c, "market": "secondhand", "month_on_month": 99.8, "yoy": 99.0} for c in ("甲", "乙")]
+            pd.DataFrame(nxt).to_csv(panel, index=False)
+            scored = ledger_detail(str(panel), d, with_provenance=False)["entries"][0]
+            self.assertEqual(scored["actual"]["months"], ["2026-10"])
+            self.assertAlmostEqual(scored["actual"]["national"][0], 99.8, places=2)
+            self.assertAlmostEqual(scored["actual"]["cities"]["甲"][0], 99.8, places=2)
+            import hashlib
+            self.assertEqual(provenance(path)["sha256"], hashlib.sha256(path.read_bytes()).hexdigest())
 
 
 if __name__ == "__main__":

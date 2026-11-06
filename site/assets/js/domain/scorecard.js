@@ -34,19 +34,6 @@ export function renderHindcast(sc, tableEl, calloutEl) {
     `<b>v0.2 论文模型</b>：北京有 ${bjOut} / ${bj.length} 个月高于其区间上沿，全国 ${nat[nat.length - 1].actual > nat[nat.length - 1].high ? "最后一个月也高于区间上沿" : "仍在区间内，但贴近上沿"}——其趋势成分滞后于拐点，区间也偏窄。`;
 }
 
-export function renderLedger(sc, el, nextRelease, horizon) {
-  const entries = (sc.ledger || []).slice().reverse();
-  el.innerHTML = entries.map((e) => {
-    const head = `<p style="margin:0 0 6px"><b>${e.origin}</b> 的预测已冻结于 <code>${e.frozen_file}</code>（含 70 城 × ${horizon} 个月的全部分位数）。`;
-    if (!e.months_scored) return head + `最新数据仍是 ${e.latest_data}，<b>等待下一期官方数据公布后自动评分</b>（预计 ${nextRelease}，估计值）。</p>`;
-    const rows = e.scored.map((x) => {
-      const n = x.national;
-      return `<tr><td>${x.month}（+${x.h}）</td><td class="num"><b>${n.actual.toFixed(2)}</b></td><td class="num">${n.median.toFixed(2)}<span class="dim"> （${n.lo80.toFixed(2)} ~ ${n.hi80.toFixed(2)}）</span></td><td>${verdict(inside(n.actual, n.lo80, n.hi80))}</td><td class="num">${Math.round(x.city_inside80 * 100)}%</td><td class="num">${x.city_mae_pct_points.toFixed(2)} / ${x.flat_mae_pct_points.toFixed(2)}</td></tr>`;
-    }).join("");
-    return head + `</p><table class="plain"><thead><tr><th>月份</th><th>全国实际</th><th>预测中位（80% 区间）</th><th>全国</th><th>70 城落入区间</th><th>70 城误差 / 不变</th></tr></thead><tbody>${rows}</tbody></table>`;
-  }).join("") || '<p class="dim">暂无冻结的预测。</p>';
-}
-
 export function renderModelTable(sc, tableEl, footEl, nOriginsEl) {
   const w = sc.walk_forward, hs = w.horizons;
   const order = ["flat", "naive", "drift12", "ar1", "damped", "damped_shrunk", "global", "chronos2", "ensemble"];

@@ -2,6 +2,7 @@
    No DOM and no globals -- the theme is passed in -- so it runs under node tests. */
 
 import { pct, cls, addMonths } from "../core/format.js";
+import { metricValues, METRIC_NAME } from "./series.js";
 
 /** "2007-12 = 100" from cum.base ("2007-12 = 100（…）"). */
 export const baseLabel = (cum) => (cum.base || "").split("（")[0] || "起点 = 100";
@@ -37,36 +38,49 @@ export function rangeStartIndex(range, histLen) {
 }
 
 /** Forecast quantile arrays rebased from "origin = 100" to the chain level at the origin. */
-export function scaledFan(fan, now) {
+export function scaledFan(fan, now, horizon = fan.q500.length) {
   const k = now / 100;
-  return Object.fromEntries(["q025", "q100", "q500", "q900", "q975"].map((q) => [q, fan[q].map((v) => +(v * k).toFixed(2))]));
+  return Object.fromEntries(["q025", "q100", "q500", "q900", "q975"].map((q) => [q, fan[q].slice(0, horizon).map((v) => +(v * k).toFixed(2))]));
 }
 
 /**
- * @param data  { cum, fan }  as loaded from cum.json / fan.json
+ * @param data   { cum, fan }  as loaded from cum.json / fan.json
  * @param region 全国 | 一线 | 二线 | 三线 | city name (tiers have no fan: history only)
- * @param opts  { compare, range, narrow, zones:{reliable,caution} }
- * @param theme { tok(name) }
+ * @param opts   { compare, compareNew, newHome, metric, range, from, to, horizon, brush, narrow, zones:{reliable,caution} }
+ *               compare: add the national line; compareNew + newHome (cum_new.json): add the new-home line of the same region;
+ *               metric: level | yoy | dd (forecast only under level); from/to: window in months (else `range`, last N years);
+ *               horizon: forecast months to draw (0 = none, default all); brush: drag-select a window on the chart
+ * @param theme  { tok(name) }
  */
-export function buildTrendOption(data, region, { compare = false, range = "all", narrow = false, zones = DEFAULT_ZONES } = {}, theme) {
+export function buildTrendOption(data, region, { compare = false, compareNew = false, newHome = null, metric = "level", range = "all", from = null, to = null, horizon = null, brush = false, narrow = false, zones = DEFAULT_ZONES } = {}, theme) {
   const { cum, fan: fanAll } = data;
   const tok = theme.tok;
   const hm = cum.months, H = hm.length;
-  const hist = cum.series[region];
+  const level = metric === "level";
+  const levels = cum.series[region];
   const ph = cum.phases[region];
-  const fan = fanAll.regions[region] || null;
-  const fm = fan ? fanAll.fc_months : [];
-  const F = fm.length;
+  const fanRaw = level ? fanAll.regions[region] || null : null;
+  const F = fanRaw ? Math.min(horizon == null ? fanAll.fc_months.length : horizon, fanAll.fc_months.length) : 0;
+  const fan = F > 0 ? fanRaw : null;
+  const fm = fan ? fanAll.fc_months.slice(0, F) : [];
   const all = hm.concat(fm);
-  const now = hist[H - 1];
+  const now = levels[H - 1];
   const pad = (n) => new Array(n).fill(null);
   const gold = tok("gold");
   const label = regionLabel(region);
+  const i0 = from ? Math.max(0, hm.findIndex((m) => m >= from)) : rangeStartIndex(range, H);
+  const iEnd = to && to < hm[H - 1] ? hm.findLastIndex((m) => m <= to) : all.length - 1;
+  const show = (arr) => metricValues(arr, metric, i0);
+  const histV = show(levels);
+  const natV = show(cum.series["全国"]);
+  const newLevels = newHome && newHome.series[region] && newHome.months.length === H ? newHome.series[region] : null;
+  const newV = newLevels ? show(newLevels) : null;
+  const fmt = level ? (v) => v.toFixed(1) : (v) => pct(v, 1);
 
   let q = null;
   const series = [];
   if (fan) {
-    const sc = scaledFan(fan, now);
+    const sc = scaledFan(fan, now, F);
     q = Object.fromEntries(Object.entries(sc).map(([k, arr]) => { const a = pad(H).concat(arr); a[H - 1] = +now.toFixed(2); return [k, a]; }));
   }
   const slice = (arr, a, b) => arr.map((v, i) => (i >= a && i <= b ? v : null));
@@ -77,20 +91,18 @@ export function buildTrendOption(data, region, { compare = false, range = "all",
       itemStyle: { color: gold }, silent: true, tooltip: { show: false }, z: 1 },
   ]);
 
-  const runs = risingRuns(hist, hm);
+  const runs = risingRuns(levels, hm);
   const areas = runs.map(([a, b]) => [{ xAxis: a, itemStyle: { color: tok("phase") } }, { xAxis: b }]);
-  if (fan) {
-    if (zones.caution < F) {
-      areas.push([{ xAxis: fm[zones.caution], name: "情景区", label: { show: true, position: "insideTop", color: tok("ink-3"), fontSize: 11.5,
-        formatter: "情景区" }, itemStyle: { color: SCENARIO_SHADE } }, { xAxis: fm[F - 1] }]);
-    }
+  if (fan && zones.caution < F) {
+    areas.push([{ xAxis: fm[zones.caution], name: "情景区", label: { show: true, position: "insideTop", color: tok("ink-3"), fontSize: 11.5,
+      formatter: "情景区" }, itemStyle: { color: SCENARIO_SHADE } }, { xAxis: fm[F - 1] }]);
   }
   const rb = cum.regime_break && hm.includes(cum.regime_break.month) ? cum.regime_break.month : null;
-  const markLines = [
-    { yAxis: now, lineStyle: { type: "dashed", color: gold, opacity: 0.55, width: 1 },
-      label: { show: true, position: "insideStartTop", color: tok("gold-ink"), fontSize: 11.5,
-        formatter: narrow ? `现价位 ${now.toFixed(0)}` : ph.back_to ? `现价位 ${now.toFixed(1)} = ${ph.back_to} 的水平` : `现价位 ${now.toFixed(1)}` } },
-  ];
+  const markLines = level
+    ? [{ yAxis: now, lineStyle: { type: "dashed", color: gold, opacity: 0.55, width: 1 },
+        label: { show: true, position: "insideStartTop", color: tok("gold-ink"), fontSize: 11.5,
+          formatter: narrow ? `现价位 ${now.toFixed(0)}` : ph.back_to ? `现价位 ${now.toFixed(1)} = ${ph.back_to} 的水平` : `现价位 ${now.toFixed(1)}` } }]
+    : [{ yAxis: 0, lineStyle: { type: "dashed", color: tok("ink-3"), opacity: 0.7, width: 1 }, label: { show: false } }];
   if (fan) {
     markLines.push({ xAxis: hm[H - 1], lineStyle: { type: "solid", color: tok("line-2"), width: 1 },
       label: { show: !narrow, position: "insideEndTop", color: tok("ink-3"), fontSize: 11.5, formatter: "数据截止 " + hm[H - 1] } });
@@ -101,18 +113,23 @@ export function buildTrendOption(data, region, { compare = false, range = "all",
   }
 
   series.push({
-    name: "历史", type: "line", data: hist.concat(pad(F)), showSymbol: false, z: 5,
+    name: "历史", type: "line", data: histV.concat(pad(F)), showSymbol: false, z: 5,
     lineStyle: { width: 2.2, color: gold }, itemStyle: { color: gold },
     markArea: { silent: true, data: areas },
     markLine: { symbol: "none", silent: true, animation: false, data: markLines },
-    markPoint: { symbol: "circle", symbolSize: 8, silent: true, itemStyle: { color: gold, borderColor: tok("panel"), borderWidth: 2 },
+    ...(level ? { markPoint: { symbol: "circle", symbolSize: 8, silent: true, itemStyle: { color: gold, borderColor: tok("panel"), borderWidth: 2 },
       label: { show: true, position: "top", color: tok("ink-2"), fontSize: 11.5, formatter: () => `高点 ${ph.peak.m}（${ph.peak.v.toFixed(0)}）` },
-      data: [{ coord: [ph.peak.m, ph.peak.v] }] },
+      data: [{ coord: [ph.peak.m, ph.peak.v] }] } } : {}),
   });
   const showCompare = compare && region !== "全国";
   if (showCompare) {
-    series.push({ name: "全国", type: "line", data: cum.series["全国"].concat(pad(F)), showSymbol: false, z: 4,
+    series.push({ name: "全国", type: "line", data: natV.concat(pad(F)), showSymbol: false, z: 4,
       lineStyle: { width: 1.6, color: tok("blue") }, itemStyle: { color: tok("blue") } });
+  }
+  const showNew = compareNew && !!newV;
+  if (showNew) {
+    series.push({ name: "新房", type: "line", data: newV.concat(pad(F)), showSymbol: false, z: 4,
+      lineStyle: { width: 1.6, color: tok("aqua"), type: "dashed" }, itemStyle: { color: tok("aqua") } });
   }
   if (fan) {
     const a0 = H - 1, aRel = H - 1 + zones.reliable, aCau = H - 1 + zones.caution, aEnd = H + F - 1;
@@ -126,6 +143,9 @@ export function buildTrendOption(data, region, { compare = false, range = "all",
   }
   const legend = fan ? ["历史", "预测中位数", "80% 区间", "95% 区间"] : ["历史"];
   if (showCompare) legend.splice(1, 0, "全国");
+  if (showNew) legend.splice(showCompare ? 2 : 1, 0, "新房");
+  const yName = level ? `指数（${baseLabel(cum)}）` : metric === "yoy" ? "同比（%）" : "距窗口内高点（%）";
+  const histName = level ? label : `${label}（${METRIC_NAME[metric]}）`;
 
   return {
     animationDuration: 400,
@@ -139,9 +159,11 @@ export function buildTrendOption(data, region, { compare = false, range = "all",
       formatter(params) {
         const i = params[0].dataIndex, m = all[i];
         if (i < H) {
-          let s = `<b>${m}</b><br/>${label}：<b>${hist[i].toFixed(1)}</b>`;
-          if (i > 0) s += `（环比 ${pct((hist[i] / hist[i - 1] - 1) * 100, 2)}）`;
-          if (showCompare) s += `<br/><span style="color:${tok("blue")}">●</span> 全国：<b>${cum.series["全国"][i].toFixed(1)}</b>`;
+          const v = histV[i];
+          let s = `<b>${m}</b><br/>${histName}：<b>${v == null ? "—" : fmt(v)}</b>`;
+          if (level && i > 0) s += `（环比 ${pct((levels[i] / levels[i - 1] - 1) * 100, 2)}）`;
+          if (showCompare) s += `<br/><span style="color:${tok("blue")}">●</span> 全国：<b>${natV[i] == null ? "—" : fmt(natV[i])}</b>`;
+          if (showNew) s += `<br/><span style="color:${tok("aqua")}">●</span> 新房：<b>${newV[i] == null ? "—" : fmt(newV[i])}</b>`;
           return s;
         }
         const h = i - H + 1, c = (k) => pct(fan[k][h - 1] - 100, 1);
@@ -154,10 +176,15 @@ export function buildTrendOption(data, region, { compare = false, range = "all",
       axisPointer: { label: { formatter: ({ value }) => value } },
     },
     yAxis: { type: "value", scale: true, axisLine: { show: false }, axisTick: { show: false }, splitLine: { lineStyle: { color: tok("line") } },
-      name: `指数（${baseLabel(cum)}）`, nameLocation: "end", nameGap: 12, nameTextStyle: { color: tok("ink-3"), fontSize: 11.5, align: "left", padding: [0, 0, 0, -40] },
-      axisLabel: { color: tok("ink-3"), fontSize: 11.5, formatter: (v) => v.toFixed(0) },
-      axisPointer: { label: { formatter: ({ value }) => (+value).toFixed(1) } } },
-    dataZoom: [{ type: "slider", show: false, startValue: all[rangeStartIndex(range, H)], endValue: all[all.length - 1] }],
+      name: yName, nameLocation: "end", nameGap: 12, nameTextStyle: { color: tok("ink-3"), fontSize: 11.5, align: "left", padding: [0, 0, 0, -40] },
+      axisLabel: { color: tok("ink-3"), fontSize: 11.5, formatter: level ? (v) => v.toFixed(0) : (v) => `${v.toFixed(0)}%` },
+      axisPointer: { label: { formatter: ({ value }) => (level ? (+value).toFixed(1) : `${(+value).toFixed(1)}%`) } } },
+    dataZoom: [{ type: "slider", show: false, startValue: all[i0], endValue: all[Math.min(iEnd, all.length - 1)] }],
+    ...(brush ? {
+      brush: { xAxisIndex: 0, brushType: "lineX", brushMode: "single", throttleType: "debounce", throttleDelay: 120, removeOnClick: false, transformable: false,
+        brushStyle: { color: tok("phase"), borderColor: gold, borderWidth: 1 } },
+      toolbox: { show: false, feature: { brush: { type: ["lineX", "clear"] } } },
+    } : {}),
     series,
   };
 }

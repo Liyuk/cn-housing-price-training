@@ -10,7 +10,9 @@ since.  The first entry (origin 2026-09) will be scored when 2026-10 data lands.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 import numpy as np
@@ -62,6 +64,51 @@ def score_ledger(panel_path: str, directory: Path = LEDGER_DIR) -> list[dict]:
                 })
         results.append(entry)
     return results
+
+
+def provenance(path: Path) -> dict:
+    """What lets a reader check a frozen file: its content hash and the git commit that published it."""
+    data = path.read_bytes()
+    info = {"file": f"{LEDGER_DIR.as_posix()}/{path.name}", "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data), "rows": data.count(b"\n") - 1,
+            "commit": None, "committed_at": None, "clean": None}
+    try:
+        out = subprocess.run(["git", "log", "-1", "--format=%H|%cI", "--", str(path)], capture_output=True, text=True, check=True, timeout=20).stdout.strip()
+        if out:
+            info["commit"], info["committed_at"] = out.split("|")
+            info["clean"] = subprocess.run(["git", "diff", "--quiet", "--", str(path)], timeout=20).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return info
+
+
+def ledger_detail(panel_path: str, directory: Path = LEDGER_DIR, city_horizon: int = 12, with_provenance: bool = True) -> dict:
+    """Everything the ledger page draws, per frozen origin: the frozen national path (all horizons), every city's first
+    `city_horizon` months, and the actuals published since (national and city, origin month = 100)."""
+    panel = pd.read_csv(panel_path)
+    panel = panel[panel["market"].eq("secondhand")]
+    mom = panel.pivot_table(index="month", columns="city", values="month_on_month", aggfunc="first")
+    entries = []
+    for path in sorted(directory.glob("*.csv")):
+        origin = path.stem
+        frozen = pd.read_csv(path)
+        nat = frozen[frozen["region"].eq("全国")].sort_values("h")
+        q = lambda frame, col, n=None: [round(float(v), 2) for v in frame.sort_values("h")[col].iloc[:n]]
+        cities = {}
+        for city, sub in frozen[~frozen["region"].isin(["全国", "一线", "二线", "三线"])].groupby("region"):
+            cities[city] = {k: q(sub, k, city_horizon) for k in ("q100", "q500", "q900")}
+        future = [m for m in mom.index if m > origin]
+        actual = {"months": future, "national": [], "cities": {}}
+        if future:
+            growth = mom.loc[future] / 100.0
+            actual["national"] = [round(float(v), 2) for v in growth.mean(axis=1).cumprod() * 100.0]
+            actual["cities"] = {c: [round(float(v), 2) for v in (growth[c].cumprod() * 100.0)] for c in growth.columns if c in cities}
+        entries.append({
+            "origin": origin, "months": [str(m) for m in nat["month"]],
+            "national": {k: q(nat, k) for k in ("q100", "q500", "q900")},
+            "cities": cities, "city_horizon": city_horizon, "actual": actual,
+            "frozen": provenance(path) if with_provenance else None,
+        })
+    return {"entries": entries}
 
 
 if __name__ == "__main__":

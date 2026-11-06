@@ -21,7 +21,7 @@ SITE = Path(__file__).resolve().parent.parent / "site"
 CSS = SITE / "assets" / "styles.css"
 
 TEXT_ROLES = ["foreground", "muted-foreground", "ink-2", "up", "down", "gold-text"]
-DATA_ROLES = ["gold", "blue", "orange"]
+DATA_ROLES = ["gold", "blue", "orange", "aqua", "violet"]
 MIN_TEXT, MIN_DATA = 4.5, 3.0
 
 

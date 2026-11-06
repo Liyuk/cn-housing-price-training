@@ -46,7 +46,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import site_extras  # noqa: E402
 from src.creprice_panel import CITY_CODES, collect as collect_creprice  # noqa: E402
-from src.forecast_ledger import score_ledger  # noqa: E402
+from src.forecast_ledger import ledger_detail, score_ledger  # noqa: E402
 from src.panel import CONSISTENT_FROM, PANEL_PATH, REGIME_BREAK, quality_of  # noqa: E402
 from src.probabilistic_forecast import city_tier, monthly_returns  # noqa: E402
 
@@ -293,11 +293,15 @@ def temperature(m6_pct: float) -> tuple[str, str]:
     return TEMPERATURES[-1][0], TEMPERATURES[-1][2]
 
 
-def _secondhand_returns() -> tuple[pd.DataFrame, pd.DataFrame]:
+def _market_returns(market: str = "secondhand") -> tuple[pd.DataFrame, pd.DataFrame]:
     panel = read(PANEL_V4)
     panel["month"] = panel["month"].dt.strftime("%Y-%m")
     panel = panel[panel["month"] >= HISTORY_START]
-    return monthly_returns(panel[panel["market"].eq("secondhand")])
+    return monthly_returns(panel[panel["market"].eq(market)])
+
+
+def _secondhand_returns() -> tuple[pd.DataFrame, pd.DataFrame]:
+    return _market_returns("secondhand")
 
 
 def _chain(r: pd.DataFrame) -> pd.DataFrame:
@@ -352,8 +356,8 @@ def _phases(values: np.ndarray, months: list[str]) -> dict:
     }
 
 
-def build_cum() -> dict:
-    r, bridged = _secondhand_returns()
+def build_cum(market: str = "secondhand") -> dict:
+    r, bridged = _market_returns(market)
     chain = _chain(r)
     months = list(chain.index)
     return {
@@ -457,6 +461,11 @@ def build_fan() -> dict:
     return out
 
 
+def build_ledger() -> dict:
+    """Frozen forecasts and what has been published since, for the ledger section of the forecast page."""
+    return ledger_detail(str(PROCESSED / PANEL_V4), ROOT / "reports" / "forecast_ledger")
+
+
 def build_scorecard() -> dict:
     """v0.2 published scenarios vs the months published after it, plus the new model's evidence."""
     report = json.loads((ROOT / "reports" / "probabilistic_forecast_backtest.json").read_text(encoding="utf-8"))
@@ -520,9 +529,11 @@ def main() -> None:
         "official.json": build_official,
         "board.json": build_board,
         "cum.json": build_cum,
+        "cum_new.json": lambda: build_cum("new"),
         "fan.json": build_fan,
         "breadth.json": build_breadth,
         "scorecard.json": build_scorecard,
+        "ledger.json": build_ledger,
     }
 
     def default(value):  # numpy scalars from pandas aggregates

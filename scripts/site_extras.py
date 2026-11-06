@@ -14,6 +14,7 @@ measured stays in here.
 from __future__ import annotations
 
 import gzip
+import io
 import json
 import shutil
 from datetime import date
@@ -110,7 +111,8 @@ def write_downloads(out_dir: Path, panel_path: Path, paths_csv: Path, board: dic
 
     def gz(name: str, frame: pd.DataFrame, note: str) -> None:
         path = out_dir / name
-        with gzip.open(path, "wt", encoding="utf-8", newline="") as handle:
+        with open(path, "wb") as raw, gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as zipped, \
+                io.TextIOWrapper(zipped, encoding="utf-8", newline="") as handle:   # mtime=0: rebuilds are byte-identical
             frame.to_csv(handle, index=False)
         files.append({"file": f"downloads/{name}", "bytes": path.stat().st_size, "note": note})
 
@@ -138,6 +140,9 @@ def _bundle_info(name: str, payload, built_at: str) -> dict:
     if name == "cum.json":
         info.update(_span(payload["months"]), freq="月度", basis=payload["base"], kind="official+legacy",
                     regime_break=payload["regime_break"]["month"])
+    elif name == "cum_new.json":
+        info.update(_span(payload["months"]), freq="月度", basis=payload["base"] + "；新建商品住宅", kind="official+legacy",
+                    regime_break=payload["regime_break"]["month"], bridged=len(payload["bridged_months"]))
     elif name == "board.json":
         info.update(asof=payload["asof"], freq="月度", basis="近 6 个月平均环比（温度）", kind="derived")
     elif name == "fan.json":
@@ -162,6 +167,11 @@ def _bundle_info(name: str, payload, built_at: str) -> dict:
         wf = payload["walk_forward"]
         info.update(start=wf["scored_from"], n=wf["n_origins"], freq="每 3 个月一个回测起点",
                     basis=f"回放起点 {payload['hindcast']['origin']}；账本 {len(payload['ledger'])} 期", kind="model")
+    elif name == "ledger.json":
+        entries = payload["entries"]
+        scored = sum(len(e["actual"]["months"]) for e in entries)
+        info.update(start=entries[0]["origin"] if entries else None, end=entries[-1]["origin"] if entries else None, n=len(entries),
+                    freq="每次更新冻结一期", basis=f"起点 = 100；已评分 {scored} 个月", kind="model")
     elif name == "yield.json":
         info.update(asof=max(c["asof"] for c in payload["cities"]), freq="月度", basis="榜内区租金收益率", kind="third_party")
     elif name == "meta.json":
