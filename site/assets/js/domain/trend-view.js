@@ -9,8 +9,8 @@
 
 import { mount, ensureEcharts } from "../core/charts.js";
 import { tok, onThemeChange, isNarrow } from "../core/theme.js";
-import { buildTrendOption } from "./trend-chart.js";
-import { aggregateOhlc, forecastLines, createCandleChart } from "./candles.js";
+import { buildTrendOption, regionLabel, baseLabel, DEFAULT_ZONES } from "./trend-chart.js";
+import { aggregateOhlc, forecastLines, shadeBlocks, candleKey, createCandleChart } from "./candles.js";
 
 const RANGES = [["all", "全部"], ["20", "20 年"], ["10", "10 年"], ["5", "5 年"], ["3", "3 年"]];
 const PERIODS = [["M", "月"], ["Q", "季"], ["Y", "年"]];
@@ -32,15 +32,18 @@ export function createTrendView(root, { data, region, regions = null, allowCompa
       <div class="seg" data-g="period" role="group" aria-label="K 线周期" hidden>${PERIODS.map(([v, l]) => `<button type="button" data-v="${v}">${l}</button>`).join("")}</div>
       ${allowCompare ? '<label class="check"><input type="checkbox" data-g="compare" checked /> 对照全国</label>' : ""}
     </div>` : ""}
+    <div class="tv-key" hidden></div>
     <div class="tv-stage">
       <div class="tv-line chart tall" role="img" aria-label="价格指数走势图"></div>
       <div class="tv-candle chart tall" role="img" aria-label="价格指数 K 线图" hidden></div>
     </div>`;
   const lineEl = root.querySelector(".tv-line");
   const candleEl = root.querySelector(".tv-candle");
+  const keyEl = root.querySelector(".tv-key");
+  const zoneSet = zones ? { reliable: zones.reliable_through, caution: zones.caution_through } : DEFAULT_ZONES;
   let candleChart = null, candleLoading = null;
 
-  const nationalCandle = () => data.cum.series["全国"].map((v, i) => ({ time: `${data.cum.months[i]}-01`, value: +v.toFixed(2) }));
+  const nationalCloses = () => aggregateOhlc(data.cum.months, data.cum.series["全国"], state.period, 100).map((c) => ({ time: c.time, value: c.close }));
 
   async function renderCandle() {
     if (!candleChart) {
@@ -51,13 +54,21 @@ export function createTrendView(root, { data, region, regions = null, allowCompa
     const hist = cum.series[state.region], months = cum.months;
     const f = fan.regions[state.region];
     const base = 100; // chain base (period before the first month = 100)
+    const compare = state.compare && state.region !== "全国";
+    keyEl.innerHTML = candleKey({ compare, forecast: !!f, zones: zoneSet, period: state.period });
     candleChart.render({
+      title: regionLabel(state.region),
+      base: baseLabel(cum),
       candles: aggregateOhlc(months, hist, state.period, base),
+      shade: shadeBlocks(hist, months, f ? fan.fc_months : [], zoneSet),
       forecast: f ? forecastLines(fan, f, months[months.length - 1], hist[hist.length - 1]) : null,
-      national: state.compare && state.region !== "全国" ? nationalCandle() : null,
+      national: compare ? nationalCloses() : null,
       peak: cum.phases[state.region].peak,
       breakMonth: cum.regime_break ? cum.regime_break.month : null,
       rangeYears: state.range,
+      origin: months[months.length - 1],
+      period: state.period,
+      zones: zoneSet,
     });
   }
 
@@ -77,6 +88,7 @@ export function createTrendView(root, { data, region, regions = null, allowCompa
     const candle = state.mode === "candle";
     lineEl.hidden = candle;
     candleEl.hidden = !candle;
+    keyEl.hidden = !candle;
     if (candle) {
       try { await renderCandle(); } catch (e) { state.mode = "line"; render(); }  // library failed to load: stay on the line chart
       return;

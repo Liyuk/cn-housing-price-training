@@ -24,8 +24,8 @@ boot("home", ["board", "cum", "fan", "breadth", "scorecard"], ({ data, vintage }
 
   createTrendView(document.querySelector("#hero-view"), { data: { cum, fan }, region: "全国", zones: vintage.forecast });
   document.querySelector("#hero-foot").innerHTML =
-    `金色为 70 城等权二手住宅指数（${cum.base.split("（")[0]}，环比链式累乘）；金色底纹为<b>上行阶段</b>（近 6 个月平均环比 &gt; 0）；点线为口径断点。` +
-    `深色带是 +${vintage.forecast.reliable_through} 个月内的 80% 区间（回测校准），中等色带到 +${vintage.forecast.caution_through} 个月（<b>谨慎参考</b>），最浅的是 +${vintage.forecast.horizon_months} 个月前的<b>情景区间</b>。K 线由月度指数合成，见“口径说明”。`;
+    `指数为 70 城等权二手住宅（${cum.base.split("（")[0]}，环比链式累乘）。折线图：金色底纹为<b>上行阶段</b>（近 6 个月平均环比 &gt; 0），点线为口径断点，` +
+    `深色带是 +${vintage.forecast.reliable_through} 个月内的 80% 区间（回测校准），中等色带到 +${vintage.forecast.caution_through} 个月（<b>谨慎参考</b>），最浅的是 +${vintage.forecast.horizon_months} 个月前的<b>情景区间</b>。K 线图的每个标注见图上方图例；K 线由月度指数合成，见“口径说明”。`;
 
   const last = br.up_mom.length - 1;
   const recent = br.months.slice(-12);

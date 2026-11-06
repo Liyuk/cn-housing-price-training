@@ -12,7 +12,7 @@ boot("stats", ["cum", "breadth"], ({ data, vintage }) => {
 
   // 1. tiers -- same TrendView as the home page, region switchable; tiers have no forecast fan
   createTrendView($("#tier-view"), { data: { cum, fan: { regions: {}, fc_months: [] } }, region: "全国", regions: ["全国", "一线", "二线", "三线"], allowCompare: true, range: "20" });
-  $("#tier-foot").textContent = `等权链式指数（${cum.base.split("（")[0]}，环比链式累乘）。一线 4 城、二线 31 城、三线 35 城各自对环比取平均再连乘；点线为口径断点。`;
+  $("#tier-foot").textContent = `等权链式指数（${cum.base.split("（")[0]}，环比链式累乘）。一线 4 城、二线 31 城、三线 35 城各自对环比取平均再连乘；折线图中点线为口径断点，K 线图中以“口径断点”标记。`;
 
   // 2. breadth
   mount($("#chart-breadth"), () => breadthOption(breadth));

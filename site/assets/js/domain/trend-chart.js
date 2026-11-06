@@ -3,6 +3,13 @@
 
 import { pct, cls, addMonths } from "../core/format.js";
 
+/** "2007-12 = 100" from cum.base ("2007-12 = 100（…）"). */
+export const baseLabel = (cum) => (cum.base || "").split("（")[0] || "起点 = 100";
+
+/** Display name of a region in chart titles, legends and tooltips. */
+export const regionLabel = (region) => (region === "全国" ? "全国（70 城等权）" : ["一线", "二线", "三线"].includes(region) ? `${region}城市（等权）` : region);
+
+export const SCENARIO_SHADE = "rgba(128,128,120,0.07)";
 export const DEFAULT_ZONES = { reliable: 12, caution: 24 }; // overridden by the manifest (computed from the scorecard)
 
 /** Runs of months where the trailing 6-month mean MoM change is positive (>= 3 months long). */
@@ -54,7 +61,7 @@ export function buildTrendOption(data, region, { compare = false, range = "all",
   const now = hist[H - 1];
   const pad = (n) => new Array(n).fill(null);
   const gold = tok("gold");
-  const label = region === "全国" ? "全国（70 城等权）" : ["一线", "二线", "三线"].includes(region) ? `${region}城市（等权）` : region;
+  const label = regionLabel(region);
 
   let q = null;
   const series = [];
@@ -75,7 +82,7 @@ export function buildTrendOption(data, region, { compare = false, range = "all",
   if (fan) {
     if (zones.caution < F) {
       areas.push([{ xAxis: fm[zones.caution], name: "情景区", label: { show: true, position: "insideTop", color: tok("ink-3"), fontSize: 11.5,
-        formatter: "情景区" }, itemStyle: { color: "rgba(128,128,120,0.07)" } }, { xAxis: fm[F - 1] }]);
+        formatter: "情景区" }, itemStyle: { color: SCENARIO_SHADE } }, { xAxis: fm[F - 1] }]);
     }
   }
   const rb = cum.regime_break && hm.includes(cum.regime_break.month) ? cum.regime_break.month : null;
@@ -122,12 +129,13 @@ export function buildTrendOption(data, region, { compare = false, range = "all",
 
   return {
     animationDuration: 400,
-    grid: { left: 44, right: 12, top: narrow ? 58 : 34, bottom: 30 },
+    grid: { left: 44, right: 12, top: narrow ? 78 : 56, bottom: 30 },
     legend: { data: legend, top: 0, left: 0, itemWidth: 14, itemHeight: 8, itemGap: 16, textStyle: { color: tok("ink-2"), fontSize: 12 } },
     tooltip: {
       trigger: "axis", confine: true, backgroundColor: tok("panel"), borderColor: tok("line-2"), borderWidth: 1,
       textStyle: { color: tok("ink"), fontSize: 12.5 }, extraCssText: "border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.25);",
-      axisPointer: { type: "line", lineStyle: { color: tok("ink-3"), width: 1 } },
+      axisPointer: { type: "cross", lineStyle: { color: tok("ink-3"), width: 1 }, crossStyle: { color: tok("ink-3"), width: 1 },
+        label: { backgroundColor: tok("foreground"), color: tok("background"), fontSize: 11, padding: [3, 6], borderRadius: 3 } },
       formatter(params) {
         const i = params[0].dataIndex, m = all[i];
         if (i < H) {
@@ -143,9 +151,12 @@ export function buildTrendOption(data, region, { compare = false, range = "all",
     xAxis: {
       type: "category", data: all, boundaryGap: false, axisLine: { lineStyle: { color: tok("line-2") } }, axisTick: { show: false }, splitLine: { show: false },
       axisLabel: { color: tok("ink-3"), fontSize: 11.5, hideOverlap: true, interval: (i, v) => v.endsWith("-01"), formatter: (v) => v.slice(0, 4) },
+      axisPointer: { label: { formatter: ({ value }) => value } },
     },
     yAxis: { type: "value", scale: true, axisLine: { show: false }, axisTick: { show: false }, splitLine: { lineStyle: { color: tok("line") } },
-      axisLabel: { color: tok("ink-3"), fontSize: 11.5, formatter: (v) => v.toFixed(0) } },
+      name: `指数（${baseLabel(cum)}）`, nameLocation: "end", nameGap: 12, nameTextStyle: { color: tok("ink-3"), fontSize: 11.5, align: "left", padding: [0, 0, 0, -40] },
+      axisLabel: { color: tok("ink-3"), fontSize: 11.5, formatter: (v) => v.toFixed(0) },
+      axisPointer: { label: { formatter: ({ value }) => (+value).toFixed(1) } } },
     dataZoom: [{ type: "slider", show: false, startValue: all[rangeStartIndex(range, H)], endValue: all[all.length - 1] }],
     series,
   };

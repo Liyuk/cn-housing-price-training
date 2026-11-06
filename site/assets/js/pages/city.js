@@ -45,7 +45,7 @@ boot("cities", ["board", "cum", "fan"], async ({ data, vintage }) => {
   ].join("");
 
   createTrendView(document.querySelector("#city-view"), { data: { cum, fan }, region: city, allowCompare: true, zones: vintage.forecast });
-  document.querySelector("#city-view-foot").innerHTML = `${city}与全国的链式指数均以 ${cum.base.split("（")[0]} 起算；${vintage.describe("cum.json", { basis: false })}。灰色竖线右侧为预测。`;
+  document.querySelector("#city-view-foot").innerHTML = `${city}与全国的链式指数均以 ${cum.base.split("（")[0]} 起算；${vintage.describe("cum.json", { basis: false })}。折线图中灰色竖线右侧为预测，K 线图中以“数据截止”标记为界。`;
   document.querySelector("#city-fan").innerHTML = fanTable(fan, city, vintage.forecast.origin, { reliable: vintage.forecast.reliable_through, caution: vintage.forecast.caution_through });
   document.querySelector("#city-fan-note").textContent = `预测起点 ${vintage.forecast.origin}，${vintage.describe("fan.json", { basis: false })}。+${vintage.forecast.reliable_through} 个月内可作预测，至 +${vintage.forecast.caution_through} 个月谨慎参考，其后仅作情景。`;
 
