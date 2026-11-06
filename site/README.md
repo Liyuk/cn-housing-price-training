@@ -4,15 +4,15 @@ GitHub Pages 静态站：70 城二手住宅价格趋势、概率预测与回测�
 
 ## 页面
 
-`index.html` 总览 · `cities.html` 城市榜 · `city.html?c=上海` 城市页 · `stats.html` 数据统计 · `forecast.html` 预测逻辑 · `data.html` 数据与方法 · `papers.html` 论文
+`index.html` 总览 · `cities.html` 城市榜 · `city.html?c=上海` 城市页 · `compare.html` 对比 · `stats.html` 数据统计 · `forecast.html` 预测逻辑 · `data.html` 数据与方法 · `papers.html` 论文
 
 ## 目录
 
 ```
 assets/styles.css        设计令牌与样式（shadcn zinc + 数据色；颜色只在这里定义，图表渲染时读取）
 assets/fonts/            Geist（OFL）
-assets/js/core/          data（带缓存的 JSON 加载）· vintage（所有时间标注）· format · theme · icons（Lucide）· charts · loader · shell · boot
-assets/js/domain/        trend-chart（纯函数）· candles（合成 K 线）· trend-view（折线/K 线切换）· board · scorecard · definitions · market-charts · district-charts
+assets/js/core/          data（带缓存的 JSON 加载）· vintage（所有时间标注）· urlstate（状态进链接）· timewindow / windowbar（时间窗口）· format · theme · icons（Lucide）· charts · loader · shell · boot
+assets/js/domain/        trend-chart（纯函数）· candles（合成 K 线）· trend-view（折线/K 线、指标、时间窗口、对照、区间统计）· series · window-stats · compare-chart · ledger / ledger-model · board · scorecard · definitions · market-charts · district-charts
 assets/js/pages/         每页一个薄脚本，只做接线
 data/                    scripts/build_demo_data.py 生成的 JSON；manifest.json 是页面与构建之间的接缝
 data/districts/<城市>.json  各城市区县价格/租金/收益率（只有采集过的城市）
@@ -61,6 +61,9 @@ node --test tests/js/*.test.mjs           # 纯函数模块：format / data / vi
 
 - **时间标注**：页面不写死日期，全部来自 manifest；月份 `YYYY-MM`，区间 `起 → 止`，预测同时写相对与绝对（`+12 个月（2027-09）`）；口径断点用竖线标出。
 - **K 线**：Lightweight Charts v5.2.1（Apache-2.0，按需懒加载，页脚署名），布局对齐 TradingView：左上角数据栏（开高低收、涨跌、对照值），右侧价格轴与现价位，下方副图为每期涨跌幅（独立的百分比纵轴），十字线在两条坐标轴上显示读数。价格指数没有日内高低点，K 线由月度链式指数合成——月线只有实体，季线、年线才有影线。折线图仍是默认。
+- **对比与时间窗口**：对比页（`compare.html`）可选 2–5 个地区叠加，指数口径下所有线在基期月都等于 100；指标可切换为同比（环比连乘）或距窗口内高点；数据统计页一个时间范围控制所有按月的图。折线图上拖选一段即可缩放并出区间统计；区间跨越口径断点（2011-02）时会提示涨跌幅不宜直接比较。选择都写进链接，可分享。
+- **新房对照**：`data/cum_new.json` 与二手指数同形（2008-01 起，全国、三个层级、70 城）；新房 2021-02 至 04 没有官方页面，由同比恒等式推算，页面上会标注。
+- **预测账本**：`data/ledger.json` 带冻结文件的 SHA-256 与公开它的 git 提交，页面上给出核对方法；评分在下一期官方数据公布、重新构建后自动出现。
 - 预测可信度分区（可作预测 / 谨慎参考 / 仅作情景）由回测**计算**并写入 manifest（`scripts/site_extras.py::forecast_zones`），图、表、文案都读它，不手写数字。
 
 ## 部署

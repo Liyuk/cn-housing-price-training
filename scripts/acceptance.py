@@ -186,9 +186,19 @@ def site_checks(manifest: dict) -> None:
         heavy[page.stem] = round(total / 1024)
     over = {k: v for k, v in heavy.items() if v > PAGE_BUDGET_KB}
     check("S4", "站点", f"每页首屏 JSON 不超过 {PAGE_BUDGET_KB} KB", not over, ", ".join(f"{k} {v}KB" for k, v in heavy.items()))
-    check("S5", "站点", "页面数量与文档一致（7 个页面、下载文件齐全）",
-          len(list((ROOT / "site").glob("*.html"))) == 7 and len(manifest["downloads"]) >= 3,
+    check("S5", "站点", "页面数量与文档一致（8 个页面、下载文件齐全）",
+          len(list((ROOT / "site").glob("*.html"))) == 8 and len(manifest["downloads"]) >= 3,
           f"{len(list((ROOT / 'site').glob('*.html')))} 个页面，{len(manifest['downloads'])} 个下载")
+    cum = json.loads((ROOT / "site/data/cum.json").read_text(encoding="utf-8"))
+    new = json.loads((ROOT / "site/data/cum_new.json").read_text(encoding="utf-8"))
+    check("S6", "站点", "新房指数与二手指数月份、地区、断点一一对齐（对照新房、对比页的前提）；推算月份已标注",
+          cum["months"] == new["months"] and set(cum["series"]) == set(new["series"]) and cum["regime_break"] == new["regime_break"] and bool(new["bridged_months"]),
+          f"{len(new['months'])} 个月 × {len(new['series'])} 个序列；推算月份 {', '.join(new['bridged_months']) or '无'}")
+    ledger = json.loads((ROOT / "site/data/ledger.json").read_text(encoding="utf-8"))
+    import hashlib
+    stale = [e["origin"] for e in ledger["entries"] if e["frozen"]["sha256"] != hashlib.sha256((ROOT / e["frozen"]["file"]).read_bytes()).hexdigest()]
+    check("S7", "站点", "预测账本页的数据与冻结文件一致（哈希可核对）且包含最新一期", not stale and ledger["entries"][-1]["origin"] == manifest["forecast"]["origin"],
+          f"{len(ledger['entries'])} 期；最新 {ledger['entries'][-1]['origin']}" + (f"；过期 {stale}" if stale else ""))
 
 
 def design_checks() -> None:

@@ -38,14 +38,14 @@ export function aggregateOhlc(months, values, period = "M", base = 100) {
 }
 
 /** Forecast lines as {time,value} points, starting from the origin so they connect to the last candle. */
-export function forecastLines(fanAll, fan, originMonth, now) {
-  const k = now / 100, months = fanAll.fc_months;
-  const mk = (arr) => [{ time: `${originMonth}-01`, value: r2(now) }].concat(arr.map((v, i) => ({ time: `${months[i]}-01`, value: r2(v * k) })));
+export function forecastLines(fanAll, fan, originMonth, now, horizon = fanAll.fc_months.length) {
+  const k = now / 100, months = fanAll.fc_months.slice(0, horizon);
+  const mk = (arr) => [{ time: `${originMonth}-01`, value: r2(now) }].concat(arr.slice(0, horizon).map((v, i) => ({ time: `${months[i]}-01`, value: r2(v * k) })));
   return { median: mk(fan.q500), lo: mk(fan.q100), hi: mk(fan.q900) };
 }
 
 /** Key for the K-line chart: every mark the chart draws, in one row (the line chart carries its own legend). */
-export function candleKey({ compare = false, forecast = false, zones = DEFAULT_ZONES, period = "Q" } = {}) {
+export function candleKey({ compare = false, compareNew = false, forecast = false, zones = DEFAULT_ZONES, period = "Q" } = {}) {
   const k = (cls, text) => `<span class="k"><i class="sw ${cls}"></i>${text}</span>`;
   const unit = { M: "月", Q: "季", Y: "年" }[period];
   return [
@@ -53,6 +53,7 @@ export function candleKey({ compare = false, forecast = false, zones = DEFAULT_Z
     k("phase", "上行阶段（近 6 个月平均环比 &gt; 0）"),
     ...(forecast ? [k("median", "预测中位数"), k("band", "80% 区间上/下沿"), k("scn", `情景区（+${zones.caution} 个月后，仅作情景）`)] : []),
     ...(compare ? [k("nat", "全国")] : []),
+    ...(compareNew ? [k("new", "新房（同地区）")] : []),
     k("chg", `下方柱：每${unit}涨跌幅`),
     `<span class="k note">开 = 上期收，收 = 期末，高/低 = 期内月度极值；预测线标注为相对现价位的变化</span>`,
   ].join("");
@@ -85,7 +86,7 @@ export function shadeBlocks(series, months, fcMonths, zones) {
 /** What the top-left data bar shows (TradingView-style): the bar under the crosshair, or the last bar when the
  *  crosshair is off the chart; in the forecast the zone and the forecast values instead of OHLC.
  *  bar: {time, open, high, low, close}|null; fc: {time, h, median, lo, hi}|null; national: close|null. */
-export function legendModel({ title, period, bar, fc, national, now, zones = DEFAULT_ZONES }) {
+export function legendModel({ title, period, bar, fc, national, newHome, now, zones = DEFAULT_ZONES }) {
   const unit = { M: "月 K", Q: "季 K", Y: "年 K" }[period];
   const out = { title, unit, time: "", ohlc: null, change: null, tone: "flatc", rows: [] };
   if (fc) {
@@ -102,6 +103,7 @@ export function legendModel({ title, period, bar, fc, national, now, zones = DEF
   out.ohlc = [["开", bar.open], ["高", bar.high], ["低", bar.low], ["收", bar.close]].map(([k, v]) => ({ k, v: v.toFixed(1) }));
   out.change = `${sgn(d, 2)}（${pct((bar.close / bar.open - 1) * 100, 2)}）`;
   if (national != null) out.rows.push({ name: "全国", value: national.toFixed(1), cls: "nat" });
+  if (newHome != null) out.rows.push({ name: "新房", value: newHome.toFixed(1), cls: "new" });
   return out;
 }
 
@@ -160,6 +162,7 @@ export async function createCandleChart(el, theme) {
   const lo = chart.addSeries(LW.LineSeries, { ...lineOpts, lineWidth: 1, lineStyle: LW.LineStyle.Dotted, title: "80% 下沿" }, 0);
   const hi = chart.addSeries(LW.LineSeries, { ...lineOpts, lineWidth: 1, lineStyle: LW.LineStyle.Dotted, title: "80% 上沿" }, 0);
   const nat = chart.addSeries(LW.LineSeries, { ...lineOpts, lineWidth: 1, title: "全国" }, 0);
+  const newS = chart.addSeries(LW.LineSeries, { ...lineOpts, lineWidth: 1, lineStyle: LW.LineStyle.Dashed, title: "新房" }, 0);
   const candleMarks = LW.createSeriesMarkers(candle, []);
   const medianMarks = LW.createSeriesMarkers(median, []);
   // pane 1: period change in percent, on its own axis
@@ -171,9 +174,8 @@ export async function createCandleChart(el, theme) {
   changePane.setStretchFactor(PANE_SHARE);
 
   const legend = Object.assign(document.createElement("div"), { className: "lwc-legend" });
-  const unit = Object.assign(document.createElement("div"), { className: "lwc-unit" });
   const paneLabel = Object.assign(document.createElement("div"), { className: "lwc-pane" });
-  el.append(legend, unit, paneLabel);
+  el.append(legend, paneLabel);
 
   function applyTheme() {
     const up = tok("orange"), down = tok("blue");   // 红涨蓝跌，与温度色一致
@@ -193,12 +195,13 @@ export async function createCandleChart(el, theme) {
     candle.applyOptions({ upColor: up, downColor: down, borderUpColor: up, borderDownColor: down, wickUpColor: up, wickDownColor: down });
     for (const s of [median, lo, hi]) s.applyOptions({ color: tok("gold") });
     nat.applyOptions({ color: tok("blue") });
+    newS.applyOptions({ color: tok("aqua") });
     if (ctx) { ctx.up = up; ctx.down = down; draw(); }
   }
 
   function showLegend(m, pctValue) {
     const v = (x) => `<b class="${m.tone}">${x}</b>`;
-    const head = `<span class="lg-title">${esc(m.title)}</span><span class="lg-unit">${m.unit}</span><span class="lg-time">${esc(m.time)}</span>`;
+    const head = `<span class="lg-title">${esc(m.title)}</span><span class="lg-unit">${m.unit} · 指数（${esc(ctx.state.base)}）</span><span class="lg-time">${esc(m.time)}</span>`;
     const ohlc = m.ohlc ? m.ohlc.map((o) => `<span>${o.k} ${v(o.v)}</span>`).join("") + `<span>${v(m.change)}</span>` : "";
     const rows = m.rows.map((r) => `<div class="row"><i class="sw ${r.cls}"></i>${r.name} <b>${esc(r.value)}</b></div>`).join("");
     legend.innerHTML = `<div class="row">${head}${ohlc}</div>${rows}`;
@@ -209,7 +212,7 @@ export async function createCandleChart(el, theme) {
   const changeOf = (c) => r2((c.close / c.open - 1) * 100);
   function idle() {
     const { state } = ctx, last = state.candles[state.candles.length - 1];
-    showLegend(legendModel({ title: state.title, period: ctx.period, bar: last, national: ctx.natLast, now: ctx.now, zones: ctx.zones }), changeOf(last));
+    showLegend(legendModel({ title: state.title, period: ctx.period, bar: last, national: ctx.natLast, newHome: ctx.newLast, now: ctx.now, zones: ctx.zones }), changeOf(last));
   }
 
   chart.subscribeCrosshairMove((p) => {
@@ -218,8 +221,8 @@ export async function createCandleChart(el, theme) {
     const { state } = ctx;
     const t = ymd(p.time), c = barAt(t);
     if (c) {
-      const n = ctx.natBy.get(c.time);
-      showLegend(legendModel({ title: state.title, period: ctx.period, bar: c, national: n == null ? null : n, now: ctx.now, zones: ctx.zones }), changeOf(c));
+      const n = ctx.natBy.get(c.time), w = ctx.newBy.get(c.time);
+      showLegend(legendModel({ title: state.title, period: ctx.period, bar: c, national: n == null ? null : n, newHome: w == null ? null : w, now: ctx.now, zones: ctx.zones }), changeOf(c));
       return;
     }
     const h = ctx.hOf.get(t), m = p.seriesData.get(median);
@@ -254,9 +257,10 @@ export async function createCandleChart(el, theme) {
     for (const s of [median, lo, hi]) s.applyOptions({ lastValueVisible: !!f });
     nat.setData(state.national || []);
     nat.applyOptions({ lastValueVisible: !!state.national });
+    newS.setData(state.newHome || []);
+    newS.applyOptions({ lastValueVisible: !!state.newHome });
     const z = ctx.zones, at = (h) => f && f.median[h] && { time: f.median[h].time, position: "aboveBar", color: ink3, shape: "circle", text: `+${h} 个月` };
     medianMarks.setMarkers([z.reliable, z.caution].map(at).filter(Boolean));
-    unit.textContent = `指数（${state.base}）`;
     placeOverlays();
     idle();
   }
@@ -267,13 +271,15 @@ export async function createCandleChart(el, theme) {
 
   return {
     applyTheme,
-    /** state: { title, base, candles, shade, forecast|null, national|null, peak, breakMonth, rangeYears|"all", origin, period, zones } */
+    /** state: { title, base, candles, shade, forecast|null, national|null, newHome|null, peak, breakMonth, window:{from,to,all}, origin, period, zones } */
     render(state) {
       const f = state.forecast;
       ctx = {
         state, period: state.period, zones: state.zones || DEFAULT_ZONES,
         now: state.candles[state.candles.length - 1].close,
         natLast: state.national ? state.national[state.national.length - 1].value : null,
+        newLast: state.newHome ? state.newHome[state.newHome.length - 1].value : null,
+        newBy: new Map((state.newHome || []).map((p) => [p.time, p.value])),
         byTime: new Map(state.candles.map((c) => [c.time, c])),
         lastBarEnd: state.origin + "-01",
         natBy: new Map((state.national || []).map((p) => [p.time, p.value])),
@@ -282,14 +288,14 @@ export async function createCandleChart(el, theme) {
       };
       draw();
       const first = state.candles[0].time;
-      const end = f ? f.median[f.median.length - 1].time : state.candles[state.candles.length - 1].time;
-      if (state.rangeYears === "all") chart.timeScale().fitContent();
+      if (state.window.all) chart.timeScale().fitContent();
       else {
-        const from = `${addMonths(end.slice(0, 7), -12 * Number(state.rangeYears) - (f ? f.median.length - 1 : 0))}-01`;
-        chart.timeScale().setVisibleRange({ from: from < first ? first : from, to: end });
+        const to = f && state.window.to >= state.origin ? f.median[f.median.length - 1].time : `${state.window.to}-01`;
+        const from = `${state.window.from}-01`;
+        chart.timeScale().setVisibleRange({ from: from < first ? first : from, to });
       }
     },
-    destroy() { ro.disconnect(); chart.remove(); legend.remove(); unit.remove(); paneLabel.remove(); },
+    destroy() { ro.disconnect(); chart.remove(); legend.remove(); paneLabel.remove(); },
   };
 }
 

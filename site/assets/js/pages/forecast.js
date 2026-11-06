@@ -1,7 +1,8 @@
 import { boot } from "../core/boot.js";
 import { Data } from "../core/data.js";
 import { mount, whenVisible } from "../core/charts.js";
-import { renderHindcast, renderLedger, renderModelTable, skillOption, coverOption } from "../domain/scorecard.js";
+import { renderHindcast, renderModelTable, skillOption, coverOption } from "../domain/scorecard.js";
+import { renderLedger } from "../domain/ledger.js";
 import { scenarioOption } from "../domain/district-charts.js";
 import { addMonths } from "../core/format.js";
 
@@ -13,7 +14,7 @@ boot("forecast", ["scorecard"], ({ data, vintage }) => {
   $("#fc-end").textContent = f.end;
   $("#hindcast-title").textContent = `先做一次实战检验：${sc.hindcast.origin} 的预测 vs 之后公布的 ${sc.hindcast.months_scored} 个月`;
   renderHindcast(sc, $("#hindcast-table"), $("#hindcast-callout"));
-  renderLedger(sc, $("#ledger"), vintage.nextRelease, vintage.forecast.horizon_months);
+  whenVisible($("#ledger"), async () => renderLedger($("#ledger"), await Data.load("ledger"), sc, { nextRelease: vintage.nextRelease }));
   renderModelTable(sc, $("#model-table"), $("#model-foot"), $("#n-origins"));
   mount($("#chart-skill"), () => skillOption(sc));
   mount($("#chart-cover"), () => coverOption(sc));

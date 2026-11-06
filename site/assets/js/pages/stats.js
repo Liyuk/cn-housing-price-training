@@ -2,7 +2,9 @@ import { boot } from "../core/boot.js";
 import { Data } from "../core/data.js";
 import { mount, whenVisible } from "../core/charts.js";
 import { createTrendView } from "../domain/trend-view.js";
-import { breadthOption, heatOption, compareOption, macroOption, lprOption } from "../domain/market-charts.js";
+import { breadthOption, heatOption, compareOption, macroOption, lprOption, withWindow } from "../domain/market-charts.js";
+import { windowFromUrl } from "../core/timewindow.js";
+import { mountWindowBar } from "../core/windowbar.js";
 import { yieldBarOption, officialOption } from "../domain/district-charts.js";
 import { pct, grp, range } from "../core/format.js";
 
@@ -10,31 +12,41 @@ boot("stats", ["cum", "breadth"], ({ data, vintage }) => {
   const { cum, breadth } = data;
   const $ = (s) => document.querySelector(s);
 
+  // one time window for every chart on the page (?r=5, ?r=custom&f=…&t=…); each chart resolves it against its own months
+  const win = windowFromUrl({ bounds: { first: cum.months[0], last: vintage.dataThrough }, defaults: { range: "all" } });
+  mountWindowBar($("#window-bar"), win, { months: cum.months, label: "共用时间范围" });
+  $("#window-bar").insertAdjacentHTML("beforeend", '<span class="note">作用于下面所有按月的图；宏观与 LPR 只有近几年的数据，超出的部分不显示。</span>');
+  const redraws = [];
+  const windowed = (el, months, build) => { const draw = () => mount(el, () => withWindow(build(), months, win.resolve(months))); draw(); redraws.push(draw); };
+  win.subscribe(() => redraws.forEach((draw) => draw()));
+
   // 1. tiers -- same TrendView as the home page, region switchable; tiers have no forecast fan
-  createTrendView($("#tier-view"), { data: { cum, fan: { regions: {}, fc_months: [] } }, region: "全国", regions: ["全国", "一线", "二线", "三线"], allowCompare: true, range: "20" });
+  createTrendView($("#tier-view"), { data: { cum, fan: { regions: {}, fc_months: [] } }, region: "全国", regions: ["全国", "一线", "二线", "三线"], allowCompare: true, newHome: () => Data.load("cum_new"), window: win, urlSync: true });
   $("#tier-foot").textContent = `等权链式指数（${cum.base.split("（")[0]}，环比链式累乘）。一线 4 城、二线 31 城、三线 35 城各自对环比取平均再连乘；折线图中点线为口径断点，K 线图中以“口径断点”标记。`;
 
   // 2. breadth
-  mount($("#chart-breadth"), () => breadthOption(breadth));
+  windowed($("#chart-breadth"), breadth.months, () => breadthOption(breadth));
   const last = breadth.up_mom.length - 1;
   $("#breadth-foot").innerHTML = `${breadth.months[last]} 有 <b>${breadth.up_mom[last]}</b> / ${breadth.n[last]} 城环比上涨。${vintage.describe("breadth.json", { basis: false })}。`;
 
   // below the fold: load on approach
   whenVisible($("#heat-card"), async () => {
     const c = await Data.load("cities_yoy");
-    mount($("#chart-heat"), () => heatOption(c));
+    windowed($("#chart-heat"), c.months, () => heatOption(c));
   });
   whenVisible($("#compare-card"), async () => {
     const m = await Data.load("market_compare");
-    mount($("#chart-compare"), () => compareOption(m));
+    windowed($("#chart-compare"), m.months, () => compareOption(m));
   });
   whenVisible($("#macro-card"), async () => {
     const [macro, lpr] = await Promise.all([Data.load("macro"), Data.load("lpr")]);
     const sel = $("#macro-picker");
     sel.innerHTML = macro.metrics.map((m) => `<option value="${m.key}">${m.label}</option>`).join("");
-    sel.addEventListener("change", () => mount($("#chart-macro"), () => macroOption(macro, sel.value)));
-    mount($("#chart-macro"), () => macroOption(macro, sel.value));
-    mount($("#chart-lpr"), () => lprOption(lpr));
+    const lprMonths = lpr.map((r) => r.m);
+    const drawMacro = () => mount($("#chart-macro"), () => withWindow(macroOption(macro, sel.value), macro.months, win.resolve(macro.months)));
+    sel.addEventListener("change", drawMacro);
+    drawMacro(); redraws.push(drawMacro);
+    windowed($("#chart-lpr"), lprMonths, () => lprOption(lpr));
     const li = macro.months.length - 1, inv = macro.inventory_wan_m2[li], inv0 = macro.series.development_investment_yoy;
     $("#macro-lead").textContent = `开发投资同比（年初累计）${macro.months[0]} 为 ${pct(inv0[0])}，${macro.months[li]} 为 ${pct(inv0[li])}；商品房待售面积 ${inv.toFixed(2)} 亿㎡（${macro.months[li]}，累计口径）。`;
     const l = lpr[lpr.length - 1];

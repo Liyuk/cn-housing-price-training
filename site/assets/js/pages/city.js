@@ -18,6 +18,7 @@ boot("cities", ["board", "cum", "fan"], async ({ data, vintage }) => {
   picker.innerHTML = board.rows.slice().sort((a, b) => a.city.localeCompare(b.city, "zh")).map((r) => `<option value="${esc(r.city)}"${r.city === city ? " selected" : ""}>${esc(r.city)}</option>`).join("");
   if (!city) picker.insertAdjacentHTML("afterbegin", '<option value="" selected disabled>选择城市…</option>');
   picker.addEventListener("change", () => { location.search = "?c=" + encodeURIComponent(picker.value); });
+  if (city) document.querySelector("#back-link").insertAdjacentHTML("afterend", ` <a href="compare.html?s=${encodeURIComponent(city + ",全国")}" id="compare-link">${icon("chevron-right", 14)}与其他城市对比</a>`);
 
   if (!row) {
     head.innerHTML = `<h1>${city ? `没有找到“${esc(city)}”` : "选择一个城市"}</h1><p class="lead">本站覆盖国家统计局 70 个大中城市。可以从上面的列表选择，或回到<a href="cities.html">城市榜</a>。</p>`;
@@ -44,7 +45,7 @@ boot("cities", ["board", "cum", "fan"], async ({ data, vintage }) => {
     fact("高于现价概率", probText(row.p_up12), "+12 个月"),
   ].join("");
 
-  createTrendView(document.querySelector("#city-view"), { data: { cum, fan }, region: city, allowCompare: true, zones: vintage.forecast });
+  createTrendView(document.querySelector("#city-view"), { data: { cum, fan }, region: city, allowCompare: true, zones: vintage.forecast, newHome: () => Data.load("cum_new"), urlSync: true });
   document.querySelector("#city-view-foot").innerHTML = `${city}与全国的链式指数均以 ${cum.base.split("（")[0]} 起算；${vintage.describe("cum.json", { basis: false })}。折线图中灰色竖线右侧为预测，K 线图中以“数据截止”标记为界。`;
   document.querySelector("#city-fan").innerHTML = fanTable(fan, city, vintage.forecast.origin, { reliable: vintage.forecast.reliable_through, caution: vintage.forecast.caution_through });
   document.querySelector("#city-fan-note").textContent = `预测起点 ${vintage.forecast.origin}，${vintage.describe("fan.json", { basis: false })}。+${vintage.forecast.reliable_through} 个月内可作预测，至 +${vintage.forecast.caution_through} 个月谨慎参考，其后仅作情景。`;

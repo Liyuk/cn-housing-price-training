@@ -110,3 +110,13 @@ export function lprOption(L) {
     ],
   };
 }
+
+/** Zoom a category-axis option to a window (months resolved against this chart's own `months`).  The slider is hidden:
+ *  the window is controlled from outside.  A window that misses the series entirely draws a message, not stray points. */
+export function withWindow(option, months, w) {
+  if (w.outside) {
+    return { ...option, series: (option.series || []).map((s) => ({ ...s, data: [], markLine: undefined, markPoint: undefined })), legend: undefined,
+      graphic: [{ type: "text", left: "center", top: "middle", style: { text: `所选区间内没有数据（本图 ${months[0]} 至 ${months[months.length - 1]}）`, fill: tok("ink-3"), fontSize: 13 } }] };
+  }
+  return { ...option, dataZoom: [{ type: "slider", show: false, xAxisIndex: 0, startValue: months[w.i0], endValue: months[w.i1] }] };
+}

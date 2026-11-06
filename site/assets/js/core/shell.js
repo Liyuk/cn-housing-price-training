@@ -9,6 +9,7 @@ import { range } from "./format.js";
 export const PAGES = [
   { id: "home", href: "index.html", label: "总览" },
   { id: "cities", href: "cities.html", label: "城市榜" },
+  { id: "compare", href: "compare.html", label: "对比" },
   { id: "stats", href: "stats.html", label: "数据统计" },
   { id: "forecast", href: "forecast.html", label: "预测逻辑" },
   { id: "data", href: "data.html", label: "数据与方法" },
