@@ -72,6 +72,7 @@ export function renderLedger(el, ledger, scorecard, { nextRelease }) {
       <p style="margin:0 0 8px">${status}</p>
       ${provenanceHtml(e)}
       <div class="tv-bar"><div class="tv-grp"><span class="tv-lab">看哪里</span><select class="search" data-region aria-label="选择地区">${regions(e).map((r) => `<option>${esc(r)}</option>`).join("")}</select></div></div>
+      <p class="foot">评分对象永远是冻结文件：即使模型在冻结之后被修订（修复回测问题等），也不改写已冻结的预测；修订后的预测只用于之后的新一期。</p>
       <div class="chart mid" data-chart role="img" aria-label="冻结的预测与实际"></div>
       <div data-table style="overflow-x:auto"></div>${summary}
     </div>`;
