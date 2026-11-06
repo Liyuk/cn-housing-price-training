@@ -53,12 +53,14 @@ yuan per square metre.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import pickle
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import sklearn
 from sklearn.ensemble import HistGradientBoostingRegressor
 
 from .forecast_ledger import freeze
@@ -93,6 +95,19 @@ def load_panel(path: str, market: str = "secondhand") -> pd.DataFrame:
 def national_returns(r: pd.DataFrame) -> pd.Series:
     """National series: log of the mean of city MoM indices."""
     return np.log(np.exp(r).mean(axis=1, skipna=True))
+
+
+def forecast_returns(frame: pd.DataFrame, require_complete: bool = False) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Mask values reconstructed from observations 12 months in the future.
+
+    A bridged cell is useful for descriptive history, but using it as a feature
+    at an earlier forecast origin leaks data that was not then available.
+    """
+    returns, bridged = monthly_returns(frame)
+    observed = returns.mask(bridged)
+    if require_complete and observed.isna().to_numpy().any():
+        raise ValueError("secondhand forecast input is incomplete; provide directly observed data")
+    return observed, bridged
 
 
 # ---------------------------------------------------------------- local models
@@ -156,7 +171,7 @@ def build_targets(r: pd.DataFrame) -> pd.DataFrame:
     """Cumulative log change over the next h months for each (month, city)."""
     out = {}
     for h in TRAIN_HORIZONS:
-        out[f"y{h}"] = r[::-1].rolling(h, min_periods=h).sum()[::-1].shift(-h)
+        out[f"y{h}"] = r[::-1].rolling(h, min_periods=h).sum()[::-1].shift(-1)
     long = pd.concat({k: v.stack(dropna=False) for k, v in out.items()}, axis=1)
     long.index.names = ["month", "city"]
     return long.reset_index()
@@ -576,6 +591,52 @@ def hindcast(r: pd.DataFrame, table: pd.DataFrame, records: dict, origins: list[
     return out
 
 
+def records_cache_key(data: Path, tsfm: Path | None, horizon: int, start: str,
+                      first_origin: str, step: int, source_paths: list[Path] | None = None) -> str:
+    """Identify the inputs that determine cached base forecasts and realized paths."""
+    sources = source_paths if source_paths is not None else [Path(__file__), Path(__file__).with_name("panel.py")]
+    digest = hashlib.sha256()
+    params = {"horizon": horizon, "start": start, "first_origin": first_origin, "step": step,
+              "numpy": np.__version__, "pandas": pd.__version__, "sklearn": sklearn.__version__,
+              "tsfm_present": tsfm is not None}
+    digest.update(json.dumps(params, sort_keys=True).encode())
+    for path in [Path(data), *([Path(tsfm)] if tsfm else []), *sources]:
+        blob = Path(path).read_bytes()
+        digest.update(len(blob).to_bytes(8, "big"))
+        digest.update(blob)
+    return digest.hexdigest()
+
+
+def _cache_metadata_path(cache: Path) -> Path:
+    return cache.with_name(cache.name + ".meta.json")
+
+
+def records_cache_valid(cache: Path, key: str) -> bool:
+    """Reject legacy, stale, incomplete or altered cache payloads."""
+    try:
+        metadata = json.loads(_cache_metadata_path(cache).read_text(encoding="utf-8"))
+        return metadata["key"] == key and metadata["sha256"] == hashlib.sha256(cache.read_bytes()).hexdigest()
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+
+
+def read_records_cache(cache: Path, key: str) -> dict | None:
+    if not records_cache_valid(cache, key):
+        return None
+    try:
+        return pickle.loads(cache.read_bytes())
+    except (OSError, pickle.UnpicklingError, EOFError, ValueError, AttributeError, ImportError):
+        return None
+
+
+def write_records_cache(cache: Path, records: dict, key: str) -> None:
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    payload = pickle.dumps(records)
+    cache.write_bytes(payload)
+    metadata = {"key": key, "sha256": hashlib.sha256(payload).hexdigest()}
+    _cache_metadata_path(cache).write_text(json.dumps(metadata), encoding="utf-8")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", default=PANEL_PATH)
@@ -596,7 +657,7 @@ def main() -> None:
 
     panel = pd.read_csv(args.data)
     panel = panel[panel["month"] >= args.start]
-    r, bridged = monthly_returns(panel[panel["market"].eq("secondhand")])
+    r, bridged = forecast_returns(panel[panel["market"].eq("secondhand")], require_complete=True)
     if args.export_returns:
         out = Path(args.returns_out)
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -605,7 +666,7 @@ def main() -> None:
         return
     if args.tsfm:
         TSFM.update(json.loads(Path(args.tsfm).read_text(encoding="utf-8"))["origins"])
-    new_r, _ = monthly_returns(panel[panel["market"].eq("new")])
+    new_r, _ = forecast_returns(panel[panel["market"].eq("new")])
     table = build_features(r, new_r).merge(build_targets(r), on=["month", "city"], how="left")
     table = table[table["r0"].notna()]
 
@@ -613,14 +674,15 @@ def main() -> None:
     origins = months[months.index(args.first_origin):-1:args.step]
     print(f"backtest: {len(origins)} origins {origins[0]} → {origins[-1]}, data through {months[-1]}")
     cache = Path(args.cache) if args.cache else None
-    if cache and cache.exists() and cache.stat().st_mtime > Path(args.data).stat().st_mtime \
-            and (not args.tsfm or cache.stat().st_mtime > Path(args.tsfm).stat().st_mtime):
-        records = pickle.loads(cache.read_bytes())
+    key = records_cache_key(Path(args.data), Path(args.tsfm) if args.tsfm else None,
+                            args.horizon, args.start, args.first_origin, args.step) if cache else ""
+    records = read_records_cache(cache, key) if cache else None
+    if records is not None:
         print(f"loaded cached backtest records from {cache}")
     else:
         records = run_backtest(r, table, origins, args.horizon)
         if cache:
-            cache.write_bytes(pickle.dumps(records))
+            write_records_cache(cache, records, key)
 
     evaluation = walk_forward_eval(records, origins, args.horizon, args.eval_from)
     frame, info, _ = final_forecast(r, table, records, origins, args.horizon)
