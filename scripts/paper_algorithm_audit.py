@@ -187,14 +187,18 @@ def first_origin_pos(labels: list, first: str) -> int:
 
 
 # ---------------------------------------------------------------- F
-def compare_with_new_model(panel_path: str, records_path: str, first: str = "2019-01") -> dict:
+def compare_with_new_model(panel_path: str, records_path: str, first: str = "2019-01",
+                           tsfm_path: str | None = None) -> dict:
     """Paper algorithm vs the current ensemble on identical origins (2019-01 on; the ensemble needs a
     realised past to learn weights, so earlier origins are not comparable)."""
-    import pickle
-
     from src import probabilistic_forecast as pf
 
-    rec = pickle.loads(Path(records_path).read_bytes())
+    cache = Path(records_path)
+    key = pf.records_cache_key(Path(panel_path), Path(tsfm_path) if tsfm_path else None,
+                               60, REGIME_BREAK, "2016-01", 3)
+    rec = pf.read_records_cache(cache, key)
+    if rec is None:
+        raise ValueError("forecast cache is missing, stale, or lacks provenance; rebuild it with matching inputs")
     origins = [o for o in rec if o >= first]
     frame = pd.read_csv(panel_path)
     frame = frame[(frame["month"] >= REGIME_BREAK) & frame["market"].eq("secondhand")]
@@ -239,6 +243,7 @@ def main() -> None:
     parser.add_argument("--paper-data", default=PAPER_DATA)
     parser.add_argument("--panel", default=PANEL_PATH)
     parser.add_argument("--output", default="reports/paper_algorithm_audit.json")
+    parser.add_argument("--cache-tsfm", default="", help="TSFM JSON used when building the forecast cache, if any")
     args = parser.parse_args()
 
     result = {"reproduction": reproduce(args.paper_data), "reproduction_ar1_fixed": reproduce(args.paper_data, ar1_fix=True), "selection": selection_diagnostics(args.paper_data),
@@ -252,7 +257,7 @@ def main() -> None:
     result["anchor"] = anchor_by_window(args.panel)
     records = ROOT / "data/processed/pf_records.pkl"
     if records.exists():
-        result["vs_new_model"] = compare_with_new_model(args.panel, str(records))
+        result["vs_new_model"] = compare_with_new_model(args.panel, str(records), tsfm_path=args.cache_tsfm or None)
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps({k: v for k, v in result.items() if k != "walk_forward"}, ensure_ascii=False, indent=1))
