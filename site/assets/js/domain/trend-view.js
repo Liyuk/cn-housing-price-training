@@ -9,7 +9,7 @@
 
 import { mount, ensureEcharts } from "../core/charts.js";
 import { tok, onThemeChange, isNarrow } from "../core/theme.js";
-import { buildTrendOption, DEFAULT_ZONES } from "./trend-chart.js";
+import { buildTrendOption, regionLabel, baseLabel, DEFAULT_ZONES } from "./trend-chart.js";
 import { aggregateOhlc, forecastLines, shadeBlocks, candleKey, createCandleChart } from "./candles.js";
 
 const RANGES = [["all", "全部"], ["20", "20 年"], ["10", "10 年"], ["5", "5 年"], ["3", "3 年"]];
@@ -57,6 +57,8 @@ export function createTrendView(root, { data, region, regions = null, allowCompa
     const compare = state.compare && state.region !== "全国";
     keyEl.innerHTML = candleKey({ compare, forecast: !!f, zones: zoneSet, period: state.period });
     candleChart.render({
+      title: regionLabel(state.region),
+      base: baseLabel(cum),
       candles: aggregateOhlc(months, hist, state.period, base),
       shade: shadeBlocks(hist, months, f ? fan.fc_months : [], zoneSet),
       forecast: f ? forecastLines(fan, f, months[months.length - 1], hist[hist.length - 1]) : null,

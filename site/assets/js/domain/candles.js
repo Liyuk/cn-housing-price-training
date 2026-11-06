@@ -5,10 +5,10 @@
    (and the open).  Monthly candles are therefore body-only. */
 
 import { loadScript } from "../core/loader.js";
-import { addMonths, pct } from "../core/format.js";
+import { addMonths, pct, sgn, esc } from "../core/format.js";
 import { risingRuns, SCENARIO_SHADE, DEFAULT_ZONES } from "./trend-chart.js";
 
-const LWC = ["https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"];
+const LWC = ["https://cdn.jsdelivr.net/npm/lightweight-charts@5.2.1/dist/lightweight-charts.standalone.production.js"];
 
 function periodStart(ym, period) {
   const [y, m] = ym.split("-").map(Number);
@@ -53,6 +53,7 @@ export function candleKey({ compare = false, forecast = false, zones = DEFAULT_Z
     k("phase", "上行阶段（近 6 个月平均环比 &gt; 0）"),
     ...(forecast ? [k("median", "预测中位数"), k("band", "80% 区间上/下沿"), k("scn", `情景区（+${zones.caution} 个月后，仅作情景）`)] : []),
     ...(compare ? [k("nat", "全国")] : []),
+    k("chg", `下方柱：每${unit}涨跌幅`),
     `<span class="k note">开 = 上期收，收 = 期末，高/低 = 期内月度极值；预测线标注为相对现价位的变化</span>`,
   ].join("");
 }
@@ -81,19 +82,32 @@ export function shadeBlocks(series, months, fcMonths, zones) {
   return { phase, scenario };
 }
 
-/** Hover read-out.  hist: {time, open, high, low, close}|null; fc: {h, median, lo, hi}|null; national: close|null. */
-export function readout({ hist, fc, national, period, now, zones }) {
-  if (hist) {
-    const chg = (hist.close / hist.open - 1) * 100;
-    let s = `${periodLabel(hist.time, period)}  开 ${hist.open.toFixed(1)}  高 ${hist.high.toFixed(1)}  低 ${hist.low.toFixed(1)}  收 ${hist.close.toFixed(1)}  涨跌 ${pct(chg, 2)}`;
-    if (national != null) s += `  全国 ${national.toFixed(1)}`;
-    return s;
-  }
+/** What the top-left data bar shows (TradingView-style): the bar under the crosshair, or the last bar when the
+ *  crosshair is off the chart; in the forecast the zone and the forecast values instead of OHLC.
+ *  bar: {time, open, high, low, close}|null; fc: {time, h, median, lo, hi}|null; national: close|null. */
+export function legendModel({ title, period, bar, fc, national, now, zones = DEFAULT_ZONES }) {
+  const unit = { M: "月 K", Q: "季 K", Y: "年 K" }[period];
+  const out = { title, unit, time: "", ohlc: null, change: null, tone: "flatc", rows: [] };
   if (fc) {
     const rel = (v) => pct((v / now - 1) * 100, 1);
-    return `${fc.time.slice(0, 7)} · +${fc.h} 个月（${ZONE_NAME(fc.h, zones)}）  中位数 ${fc.median.toFixed(1)}（${rel(fc.median)}）  80% 区间 ${rel(fc.lo)} ~ ${rel(fc.hi)}`;
+    out.time = `${fc.time.slice(0, 7)} · +${fc.h} 个月（${ZONE_NAME(fc.h, zones)}）`;
+    out.rows.push({ name: "预测中位数", value: `${fc.median.toFixed(1)}（${rel(fc.median)}）`, cls: "median" });
+    out.rows.push({ name: "80% 区间", value: `${fc.lo.toFixed(1)} ~ ${fc.hi.toFixed(1)}（${rel(fc.lo)} ~ ${rel(fc.hi)}）`, cls: "band" });
+    return out;
   }
-  return "";
+  if (!bar) return out;
+  const d = bar.close - bar.open;
+  out.time = periodLabel(bar.time, period);
+  out.tone = d > 0 ? "up" : d < 0 ? "down" : "flatc";
+  out.ohlc = [["开", bar.open], ["高", bar.high], ["低", bar.low], ["收", bar.close]].map(([k, v]) => ({ k, v: v.toFixed(1) }));
+  out.change = `${sgn(d, 2)}（${pct((bar.close / bar.open - 1) * 100, 2)}）`;
+  if (national != null) out.rows.push({ name: "全国", value: national.toFixed(1), cls: "nat" });
+  return out;
+}
+
+/** Period change in percent per candle (the lower pane, where TradingView puts volume). */
+export function changeBars(candles) {
+  return candles.map((c) => ({ time: c.time, value: r2((c.close / c.open - 1) * 100) }));
 }
 
 /** Lightweight Charts parses only rgb/hex/legacy hsl; the design tokens use `hsl(240 4% 46%)`, so resolve through the browser. */
@@ -106,101 +120,165 @@ function resolveColor(value) {
   return rgb;
 }
 
+const PANE_SHARE = 0.2;   // the change pane takes a fifth of the plot height, like TradingView's volume pane
+
 export async function createCandleChart(el, theme) {
   await loadScript(LWC);
   const LW = window.LightweightCharts;
   const tok = (name) => resolveColor(theme.tok(name));
+  const alpha = (rgb, a) => rgb.replace(/^rgb\((.*)\)$/, `rgba($1, ${a})`);
   const ymd = (t) => (typeof t === "string" ? t : typeof t === "number" ? new Date(t * 1000).toISOString() : `${t.year}-${String(t.month).padStart(2, "0")}-${String(t.day).padStart(2, "0")}`).slice(0, 10);
+  let ctx = null;
+  /** The candle whose period contains a date (months between quarterly/yearly candles map to their candle). */
+  const barAt = (s) => {
+    const cs = ctx.state.candles;
+    return s >= cs[0].time && s <= ctx.lastBarEnd ? ctx.byTime.get(nearest(cs, s)) : null;
+  };
+  const crossLabel = (t) => {
+    const s = ymd(t);
+    if (!ctx) return s.slice(0, 7);
+    const bar = barAt(s);
+    return bar ? periodLabel(bar.time, ctx.period) : s.slice(0, 7);
+  };
   const chart = LW.createChart(el, {
-    autoSize: true, crosshair: { mode: LW.CrosshairMode.Normal },
-    localization: { timeFormatter: (t) => ymd(t).slice(0, 7) },
+    autoSize: true,
+    crosshair: { mode: LW.CrosshairMode.Normal },
+    localization: { locale: "zh-CN", timeFormatter: crossLabel, priceFormatter: (v) => v.toFixed(1) },
+    rightPriceScale: { scaleMargins: { top: 0.16, bottom: 0.06 }, minimumWidth: 64 },
+    timeScale: { rightOffset: 3, timeVisible: false,
+      tickMarkFormatter: (t, type) => { const s = ymd(t); return type === 0 ? s.slice(0, 4) : `${+s.slice(5, 7)}月`; } },
   });
-  // background blocks first so everything else draws on top; value 1 on a fixed 0..1 scale = full pane height
+  // pane 0: price.  Background blocks first so everything else draws on top; value 1 on a fixed 0..1 scale = full pane height
   const shadeOpts = { priceScaleId: "shade", priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, lineVisible: false,
     autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 1 } }) };
-  const phaseShade = chart.addAreaSeries(shadeOpts);
-  const scenarioShade = chart.addAreaSeries(shadeOpts);
-  chart.priceScale("shade").applyOptions({ scaleMargins: { top: 0, bottom: 0 }, visible: false });
-  const candle = chart.addCandlestickSeries({ priceLineVisible: false, lastValueVisible: false });
+  const phaseShade = chart.addSeries(LW.AreaSeries, shadeOpts, 0);
+  const scenarioShade = chart.addSeries(LW.AreaSeries, shadeOpts, 0);
+  chart.priceScale("shade", 0).applyOptions({ scaleMargins: { top: 0, bottom: 0 } });
+  const candle = chart.addSeries(LW.CandlestickSeries, { title: "现价位", priceLineStyle: LW.LineStyle.Dashed, priceLineWidth: 1 }, 0);
   const lineOpts = { priceLineVisible: false, crosshairMarkerVisible: false };
-  const median = chart.addLineSeries({ ...lineOpts, lineWidth: 2, lineStyle: LW.LineStyle.Dashed, title: "预测中位数" });
-  const lo = chart.addLineSeries({ ...lineOpts, lineWidth: 1, lineStyle: LW.LineStyle.Dotted, title: "80% 下沿" });
-  const hi = chart.addLineSeries({ ...lineOpts, lineWidth: 1, lineStyle: LW.LineStyle.Dotted, title: "80% 上沿" });
-  const nat = chart.addLineSeries({ ...lineOpts, lineWidth: 1, title: "全国", lastValueVisible: true });
-  const legend = document.createElement("div");
-  legend.className = "lwc-legend";
-  el.appendChild(legend);
-  let ctx = null, nowLine = null;
+  const median = chart.addSeries(LW.LineSeries, { ...lineOpts, lineWidth: 2, lineStyle: LW.LineStyle.Dashed, title: "中位数", crosshairMarkerVisible: true, crosshairMarkerRadius: 3 }, 0);
+  const lo = chart.addSeries(LW.LineSeries, { ...lineOpts, lineWidth: 1, lineStyle: LW.LineStyle.Dotted, title: "80% 下沿" }, 0);
+  const hi = chart.addSeries(LW.LineSeries, { ...lineOpts, lineWidth: 1, lineStyle: LW.LineStyle.Dotted, title: "80% 上沿" }, 0);
+  const nat = chart.addSeries(LW.LineSeries, { ...lineOpts, lineWidth: 1, title: "全国" }, 0);
+  const candleMarks = LW.createSeriesMarkers(candle, []);
+  const medianMarks = LW.createSeriesMarkers(median, []);
+  // pane 1: period change in percent, on its own axis
+  const change = chart.addSeries(LW.HistogramSeries, { priceLineVisible: false, lastValueVisible: false, base: 0,
+    priceFormat: { type: "custom", formatter: (v) => `${v.toFixed(1)}%`, minMove: 0.01 } }, 1);
+  chart.priceScale("right", 1).applyOptions({ scaleMargins: { top: 0.18, bottom: 0.04 }, minimumWidth: 64 });
+  const [pricePane, changePane] = chart.panes();
+  pricePane.setStretchFactor(1 - PANE_SHARE);
+  changePane.setStretchFactor(PANE_SHARE);
+
+  const legend = Object.assign(document.createElement("div"), { className: "lwc-legend" });
+  const unit = Object.assign(document.createElement("div"), { className: "lwc-unit" });
+  const paneLabel = Object.assign(document.createElement("div"), { className: "lwc-pane" });
+  el.append(legend, unit, paneLabel);
 
   function applyTheme() {
     const up = tok("orange"), down = tok("blue");   // 红涨蓝跌，与温度色一致
+    const cross = { color: tok("ink-3"), labelBackgroundColor: tok("foreground") };
     chart.applyOptions({
-      layout: { background: { type: "solid", color: "transparent" }, textColor: tok("ink-3"), fontFamily: getComputedStyle(document.body).fontFamily },
+      layout: { background: { type: "solid", color: "transparent" }, textColor: tok("ink-3"), fontFamily: getComputedStyle(document.body).fontFamily, fontSize: 11,
+        panes: { separatorColor: tok("line-2"), separatorHoverColor: tok("line"), enableResize: true } },
       grid: { vertLines: { color: tok("line") }, horzLines: { color: tok("line") } },
+      crosshair: { vertLine: cross, horzLine: cross },
       rightPriceScale: { borderColor: tok("line-2") },
-      timeScale: { borderColor: tok("line-2"), timeVisible: false, rightOffset: 2, tickMarkFormatter: (t, type) => (type === 0 ? ymd(t).slice(0, 4) : ymd(t).slice(0, 7)) },
+      timeScale: { borderColor: tok("line-2") },
     });
+    chart.priceScale("right", 1).applyOptions({ borderColor: tok("line-2") });
     const tint = (c) => ({ topColor: c, bottomColor: c });
     phaseShade.applyOptions(tint(tok("phase")));
     scenarioShade.applyOptions(tint(SCENARIO_SHADE));
     candle.applyOptions({ upColor: up, downColor: down, borderUpColor: up, borderDownColor: down, wickUpColor: up, wickDownColor: down });
-    median.applyOptions({ color: tok("gold") });
-    lo.applyOptions({ color: tok("gold") });
-    hi.applyOptions({ color: tok("gold") });
+    for (const s of [median, lo, hi]) s.applyOptions({ color: tok("gold") });
     nat.applyOptions({ color: tok("blue") });
-    if (ctx) draw();
+    if (ctx) { ctx.up = up; ctx.down = down; draw(); }
   }
-  applyTheme();
+
+  function showLegend(m, pctValue) {
+    const v = (x) => `<b class="${m.tone}">${x}</b>`;
+    const head = `<span class="lg-title">${esc(m.title)}</span><span class="lg-unit">${m.unit}</span><span class="lg-time">${esc(m.time)}</span>`;
+    const ohlc = m.ohlc ? m.ohlc.map((o) => `<span>${o.k} ${v(o.v)}</span>`).join("") + `<span>${v(m.change)}</span>` : "";
+    const rows = m.rows.map((r) => `<div class="row"><i class="sw ${r.cls}"></i>${r.name} <b>${esc(r.value)}</b></div>`).join("");
+    legend.innerHTML = `<div class="row">${head}${ohlc}</div>${rows}`;
+    const tone = pctValue > 0 ? "up" : pctValue < 0 ? "down" : "flatc";
+    paneLabel.innerHTML = `期间涨跌幅（%，每${{ M: "月", Q: "季", Y: "年" }[ctx.period]}）${pctValue == null ? "" : ` <b class="${tone}">${pct(pctValue, 2)}</b>`}`;
+  }
+
+  const changeOf = (c) => r2((c.close / c.open - 1) * 100);
+  function idle() {
+    const { state } = ctx, last = state.candles[state.candles.length - 1];
+    showLegend(legendModel({ title: state.title, period: ctx.period, bar: last, national: ctx.natLast, now: ctx.now, zones: ctx.zones }), changeOf(last));
+  }
 
   chart.subscribeCrosshairMove((p) => {
-    if (!ctx || !p.time) { legend.textContent = ""; return; }
-    const c = p.seriesData.get(candle);
-    const t = String(p.time);
+    if (!ctx) return;
+    if (!p.time || !p.point || p.point.x < 0) { idle(); return; }
+    const { state } = ctx;
+    const t = ymd(p.time), c = barAt(t);
     if (c) {
-      const n = p.seriesData.get(nat);
-      legend.textContent = readout({ hist: { ...c, time: t }, national: n ? n.value : null, period: ctx.period, now: ctx.now, zones: ctx.zones });
+      const n = ctx.natBy.get(c.time);
+      showLegend(legendModel({ title: state.title, period: ctx.period, bar: c, national: n == null ? null : n, now: ctx.now, zones: ctx.zones }), changeOf(c));
       return;
     }
     const h = ctx.hOf.get(t), m = p.seriesData.get(median);
-    legend.textContent = h && m ? readout({ fc: { time: t, h, median: m.value, lo: p.seriesData.get(lo).value, hi: p.seriesData.get(hi).value }, now: ctx.now, zones: ctx.zones }) : "";
+    if (h && m) showLegend(legendModel({ title: state.title, period: ctx.period, fc: { time: t, h, median: m.value, lo: p.seriesData.get(lo).value, hi: p.seriesData.get(hi).value }, now: ctx.now, zones: ctx.zones }), null);
+    else idle();
   });
+
+  function placeOverlays() {
+    paneLabel.style.top = `${Math.round(chart.paneSize(0).height) + 4}px`;   // just below the pane separator
+  }
 
   function draw() {
     const { state } = ctx;
-    const tokGold = tok("gold");
-    candle.setData(state.candles);
+    const tokGold = tok("gold"), ink3 = tok("ink-3");
+    // two empty periods on the left so the first tick label is not clipped at the edge
+    const step = { M: 1, Q: 3, Y: 12 }[ctx.period];
+    const first = state.candles[0].time.slice(0, 7);
+    const lead = [2, 1].map((k) => ({ time: `${addMonths(first, -k * step)}-01` }));
+    candle.setData(lead.concat(state.candles));
+    change.setData(changeBars(state.candles).map((b) => ({ ...b, color: alpha(b.value >= 0 ? ctx.up : ctx.down, 0.6) })));
     phaseShade.setData(state.shade.phase);
     scenarioShade.setData(state.shade.scenario);
-    if (nowLine) candle.removePriceLine(nowLine);
-    nowLine = candle.createPriceLine({ price: ctx.now, color: tokGold, lineWidth: 1, lineStyle: LW.LineStyle.Dashed, axisLabelVisible: true, title: "现价位" });
-    // markers must be sorted by time and sit on an existing candle time
     const times = new Set(state.candles.map((c) => c.time));
     const last = state.candles[state.candles.length - 1].time;
     const markers = [];
     if (state.peak) markers.push({ time: nearest(state.candles, `${state.peak.m}-01`), position: "aboveBar", color: tokGold, shape: "arrowDown", text: `高点 ${state.peak.m}（${state.peak.v.toFixed(0)}）` });
-    if (state.breakMonth) markers.push({ time: nearest(state.candles, `${state.breakMonth}-01`), position: "belowBar", color: tok("ink-3"), shape: "square", text: `口径断点 ${state.breakMonth}` });
-    markers.push({ time: last, position: "belowBar", color: tok("ink-3"), shape: "circle", text: `数据截止 ${state.origin}` });
-    candle.setMarkers(markers.filter((m) => times.has(m.time)).sort((a, b) => (a.time < b.time ? -1 : 1)));
+    if (state.breakMonth) markers.push({ time: nearest(state.candles, `${state.breakMonth}-01`), position: "belowBar", color: ink3, shape: "square", text: `口径断点 ${state.breakMonth}` });
+    markers.push({ time: last, position: "belowBar", color: ink3, shape: "circle", text: `数据截止 ${state.origin}` });
+    candleMarks.setMarkers(markers.filter((m) => times.has(m.time)).sort((a, b) => (a.time < b.time ? -1 : 1)));
     const f = state.forecast;
     median.setData(f ? f.median : []); lo.setData(f ? f.lo : []); hi.setData(f ? f.hi : []);
     for (const s of [median, lo, hi]) s.applyOptions({ lastValueVisible: !!f });
     nat.setData(state.national || []);
     nat.applyOptions({ lastValueVisible: !!state.national });
-    if (f) {
-      const z = ctx.zones, at = (h) => f.median[h] && { time: f.median[h].time, position: "aboveBar", color: tok("ink-3"), shape: "circle", text: `+${h} 个月` };
-      median.setMarkers([z.reliable, z.caution].map(at).filter(Boolean));
-    } else median.setMarkers([]);
+    const z = ctx.zones, at = (h) => f && f.median[h] && { time: f.median[h].time, position: "aboveBar", color: ink3, shape: "circle", text: `+${h} 个月` };
+    medianMarks.setMarkers([z.reliable, z.caution].map(at).filter(Boolean));
+    unit.textContent = `指数（${state.base}）`;
+    placeOverlays();
+    idle();
   }
+
+  const ro = new ResizeObserver(() => ctx && placeOverlays());
+  ro.observe(el);
+  applyTheme();
 
   return {
     applyTheme,
-    /** state: { candles, shade, forecast|null, national|null, peak:{m,v}|null, breakMonth|null, rangeYears|"all", origin, period, zones } */
+    /** state: { title, base, candles, shade, forecast|null, national|null, peak, breakMonth, rangeYears|"all", origin, period, zones } */
     render(state) {
       const f = state.forecast;
       ctx = {
-        state, period: state.period, zones: state.zones || { reliable: 12, caution: 24 },
+        state, period: state.period, zones: state.zones || DEFAULT_ZONES,
         now: state.candles[state.candles.length - 1].close,
+        natLast: state.national ? state.national[state.national.length - 1].value : null,
+        byTime: new Map(state.candles.map((c) => [c.time, c])),
+        lastBarEnd: state.origin + "-01",
+        natBy: new Map((state.national || []).map((p) => [p.time, p.value])),
         hOf: new Map((f ? f.median : []).map((p, i) => [p.time, i])),
+        up: tok("orange"), down: tok("blue"),
       };
       draw();
       const first = state.candles[0].time;
@@ -211,7 +289,7 @@ export async function createCandleChart(el, theme) {
         chart.timeScale().setVisibleRange({ from: from < first ? first : from, to: end });
       }
     },
-    destroy() { chart.remove(); legend.remove(); },
+    destroy() { ro.disconnect(); chart.remove(); legend.remove(); unit.remove(); paneLabel.remove(); },
   };
 }
 
